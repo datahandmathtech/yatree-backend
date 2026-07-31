@@ -1,4 +1,4 @@
-const CACHE_NAME = 'logkaro-v15';
+const CACHE_NAME = 'logkaro-v16';
 
 self.addEventListener('install', (event) => {
     event.waitUntil(
@@ -33,10 +33,32 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-    // Basic fetch handler required for PWA installability
+    // Ignore non-GET requests (like POST/PUT/DELETE API calls)
+    if (event.request.method !== 'GET') {
+        return;
+    }
+
     event.respondWith(
         fetch(event.request).catch(() => {
-            return caches.match(event.request);
+            return caches.match(event.request).then((response) => {
+                if (response) {
+                    return response;
+                }
+                
+                // If nothing in cache, return a generic offline response
+                // This prevents the "Failed to convert value to 'Response'" error
+                if (event.request.url.includes('/api/')) {
+                    return new Response(JSON.stringify({ success: false, message: 'You are offline or network error' }), {
+                        status: 503,
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                }
+                
+                return new Response('Offline - Network Error', {
+                    status: 503,
+                    statusText: 'Service Unavailable'
+                });
+            });
         })
     );
 });
