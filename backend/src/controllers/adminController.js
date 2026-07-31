@@ -3216,6 +3216,7 @@ const addFuelEntry = asyncHandler(async (req, res) => {
         stationName,
         paymentMode,
         paymentSource,
+        paymentBy,
         driver,
         slipPhoto
     } = req.body;
@@ -3236,6 +3237,7 @@ const addFuelEntry = asyncHandler(async (req, res) => {
         stationName,
         paymentMode,
         paymentSource: paymentSource || 'Office',
+        paymentBy,
         driver,
         slipPhoto,
         createdBy: req.user._id
@@ -3350,6 +3352,7 @@ const updateFuelEntry = asyncHandler(async (req, res) => {
         stationName,
         paymentMode,
         paymentSource,
+        paymentBy,
         driver,
         slipPhoto
     } = req.body;
@@ -3370,6 +3373,7 @@ const updateFuelEntry = asyncHandler(async (req, res) => {
     entry.stationName = stationName || entry.stationName;
     entry.paymentMode = paymentMode || entry.paymentMode;
     entry.paymentSource = paymentSource || entry.paymentSource;
+    if (paymentBy !== undefined) entry.paymentBy = paymentBy;
     entry.driver = driver || entry.driver;
 
     if (slipPhoto && slipPhoto.trim() !== '') {
