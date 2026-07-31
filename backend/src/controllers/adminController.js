@@ -3169,34 +3169,47 @@ const deleteMaintenanceRecord = asyncHandler(async (req, res) => {
 // Helper to recalculate fuel metrics using the "Previous Fill" logic
 const recalculateFuelMetrics = async (vehicleId) => {
     const entries = await Fuel.find({ vehicle: vehicleId }).sort({ odometer: 1, date: 1 });
+    if (!entries.length) return;
+
     let prevOdometer = null;
     let prevQuantity = null;
     let prevAmount = null;
-    let prevRate = null;
+
+    const bulkOps = [];
 
     for (const entry of entries) {
-        if (prevOdometer === null) {
-            entry.distance = 0;
-            entry.mileage = 0;
-            entry.costPerKm = 0;
-        } else {
-            entry.distance = entry.odometer - prevOdometer;
+        let newDistance = 0;
+        let newMileage = 0;
+        let newCostPerKm = 0;
 
-            if (entry.distance > 0 && prevQuantity > 0) {
+        if (prevOdometer !== null) {
+            newDistance = entry.odometer - prevOdometer;
+
+            if (newDistance > 0 && prevQuantity > 0) {
                 // Mileage = Distance covered / Fuel added at the START of this trip (prev entry)
-                entry.mileage = Number((entry.distance / prevQuantity).toFixed(2));
+                newMileage = Number((newDistance / prevQuantity).toFixed(2));
                 // Cost/KM = Previous Amount / Distance covered
-                entry.costPerKm = Number((prevAmount / entry.distance).toFixed(2));
-            } else {
-                entry.mileage = 0;
-                entry.costPerKm = 0;
+                newCostPerKm = Number((prevAmount / newDistance).toFixed(2));
             }
         }
-        await entry.save();
+
+        // Only add to bulk update if values actually changed
+        if (entry.distance !== newDistance || entry.mileage !== newMileage || entry.costPerKm !== newCostPerKm) {
+            bulkOps.push({
+                updateOne: {
+                    filter: { _id: entry._id },
+                    update: { $set: { distance: newDistance, mileage: newMileage, costPerKm: newCostPerKm } }
+                }
+            });
+        }
+
         prevOdometer = entry.odometer;
         prevQuantity = entry.quantity;
         prevAmount = entry.amount;
-        prevRate = entry.rate;
+    }
+
+    if (bulkOps.length > 0) {
+        await Fuel.bulkWrite(bulkOps);
     }
 };
 
