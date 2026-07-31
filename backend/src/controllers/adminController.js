@@ -3633,7 +3633,7 @@ const approveRejectExpense = asyncHandler(async (req, res) => {
     if (status === 'approved') {
         if (expense.type === 'fuel') {
             // Optional overrides from Admin
-            const { amount, quantity, rate, slipPhoto, paymentSource } = req.body;
+            const { amount, quantity, rate, slipPhoto, paymentSource, paymentBy } = req.body;
             let finalOdometer = Number(req.body.odometer || expense.km || 0);
             let finalAmount = Number(amount || expense.amount || 0);
             // Use admin override OR driver's submitted quantity. Default to 1 to avoid validation error.
@@ -3648,8 +3648,11 @@ const approveRejectExpense = asyncHandler(async (req, res) => {
             const validPaymentSources = ['Office', 'Guest'];
             const rawPaymentSource = paymentSource || expense.paymentSource || 'Office';
             const finalPaymentSource = (rawPaymentSource.toLowerCase().includes('guest')) ? 'Guest' : 'Office';
+            
+            // PaymentBy (Guest name / Office Payer name)
+            const finalPaymentBy = paymentBy !== undefined ? paymentBy : (expense.paymentBy || '');
 
-            console.log(`[approveRejectExpense] Creating fuel entry: vehicleId=${vehicleId}, amount=${finalAmount}, qty=${finalQuantity}, rate=${finalRate}, odometer=${finalOdometer}, paymentSource=${finalPaymentSource}`);
+            console.log(`[approveRejectExpense] Creating fuel entry: vehicleId=${vehicleId}, amount=${finalAmount}, qty=${finalQuantity}, rate=${finalRate}, odometer=${finalOdometer}, paymentSource=${finalPaymentSource}, paymentBy=${finalPaymentBy}`);
 
             // Dedup check: If admin already entered this fuel manually via Reports or Fuel page
             const existingFuel = await Fuel.findOne({
@@ -3679,6 +3682,7 @@ const approveRejectExpense = asyncHandler(async (req, res) => {
                     rate: finalRate,
                     odometer: finalOdometer,
                     paymentSource: finalPaymentSource,
+                    paymentBy: finalPaymentBy,
                     driver: driverName,
                     createdBy: req.user._id,
                     source: 'Driver',
