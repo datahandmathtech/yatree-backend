@@ -4148,6 +4148,9 @@ const getDriverSalarySummaryInternal = async (companyId, month, year, isFreelanc
             // 💰 RECORD ATTENDANCE EARNINGS
             let totalRoutineEarnings = 0;
             let nightStayCount = 0;
+            let sameDayCount = 0;
+            let totalNightStayAmount = 0;
+            let totalSameDayAmount = 0;
             const datesProcessed = new Set();
 
             // Optimization: check if overtime is enabled once
@@ -4186,7 +4189,14 @@ const getDriverSalarySummaryInternal = async (companyId, month, year, isFreelanc
                 }
 
                 totalRoutineEarnings += (bonuses + otBonus);
-                if (nightStay > 0) nightStayCount += 1;
+                if (nightStay > 0) {
+                    nightStayCount += 1;
+                    totalNightStayAmount += nightStay;
+                }
+                if (sameDayReturn > 0) {
+                    sameDayCount += 1;
+                    totalSameDayAmount += sameDayReturn;
+                }
             }
 
             // 🅿️ PARKING
@@ -4236,6 +4246,9 @@ const getDriverSalarySummaryInternal = async (companyId, month, year, isFreelanc
                 dailyWage: d.dailyWage || 0,
                 workingDays: datesProcessed.size,
                 nightStayCount,
+                sameDayCount,
+                totalNightStayAmount,
+                totalSameDayAmount,
                 totalEarned,
                 totalAllowances,
                 totalAdvances: totalAdvancesThisMonth,
