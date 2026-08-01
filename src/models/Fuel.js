@@ -55,6 +55,9 @@ const fuelSchema = new mongoose.Schema({
         type: String, // Can store Name or Driver ID
         required: true
     },
+    paymentBy: {
+        type: String
+    },
     // Calculated Fields
     distance: {
         type: Number,

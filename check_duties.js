@@ -1,18 +1,29 @@
+require('dotenv').config();
 const mongoose = require('mongoose');
-const uri = 'mongodb://yatree_admin:Mayank123@ac-n3u3fkt-shard-00-00.iuq9w0n.mongodb.net:27017,ac-n3u3fkt-shard-00-01.iuq9w0n.mongodb.net:27017,ac-n3u3fkt-shard-00-02.iuq9w0n.mongodb.net:27017/taxi-fleet?authSource=admin&tls=true';
 
-mongoose.connect(uri).then(async () => {
-    const Attendance = mongoose.model('Attendance', new mongoose.Schema({}, { strict: false }));
-    const User = mongoose.model('User', new mongoose.Schema({}, { strict: false }));
+async function run() {
+    await mongoose.connect(process.env.MONGODB_URI);
     
-    const ram = await User.findOne({ name: /Ram/i, driverType: 'Bus' });
-    console.log("Ram ID:", ram._id);
+    const Duty = mongoose.connection.db.collection('duties');
     
-    const count = await Attendance.countDocuments({ driver: ram._id, status: 'completed' });
-    console.log("Total duties:", count);
+    const start = new Date('2026-06-01T00:00:00Z');
+    const end = new Date('2026-06-30T23:59:59Z');
     
-    const sample = await Attendance.findOne({ driver: ram._id });
-    console.log("Sample duty:", sample);
+    const juneDuties = await Duty.find({ createdAt: { $gte: start, $lte: end } }).toArray();
+    console.log(`June Duties: ${juneDuties.length}`);
+    
+    // Check recent duties
+    const dateLimit = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    const recentDuties = await Duty.find({ _id: { $gt: mongoose.Types.ObjectId.createFromTime(dateLimit.getTime() / 1000) } }).toArray();
+    console.log(`Duties added in last 48 hours: ${recentDuties.length}`);
+    
+    if (recentDuties.length > 0) {
+        for (const d of recentDuties.slice(0,3)) {
+            console.log(`- Duty ID: ${d._id}, Company: ${d.company}`);
+        }
+    }
     
     process.exit(0);
-});
+}
+
+run().catch(console.error);

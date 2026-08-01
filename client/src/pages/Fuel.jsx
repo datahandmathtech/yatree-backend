@@ -132,6 +132,7 @@ const FuelPage = () => {
             stationName: '',
             paymentMode: 'Cash',
             paymentSource: 'Office',
+            paymentBy: '',
             driver: '',
             slipPhoto: ''
         });
@@ -195,6 +196,7 @@ const FuelPage = () => {
         stationName: '',
         paymentMode: 'Cash',
         paymentSource: 'Office',
+            paymentBy: '',
         driver: '',
         slipPhoto: ''
     });
@@ -325,6 +327,7 @@ const FuelPage = () => {
             stationName: '',
             paymentMode: 'Cash',
             paymentSource: 'Office',
+            paymentBy: '',
             driver: '',
             slipPhoto: ''
         });
@@ -344,6 +347,7 @@ const FuelPage = () => {
             stationName: entry.stationName || '',
             paymentMode: entry.paymentMode || 'Cash',
             paymentSource: entry.paymentSource || 'Office',
+            paymentBy: entry.paymentBy || '',
             driver: entry.driver || '',
             slipPhoto: entry.slipPhoto || ''
         });
@@ -423,6 +427,7 @@ const FuelPage = () => {
             driver: entry.driver || '',
             fuelType: entry.fuelType || 'Diesel',
             paymentSource: entry.paymentSource || 'Office',
+            paymentBy: entry.paymentBy || '',
             quantity: entry.quantity ? entry.quantity : '', // Pre-fill if driver submitted
             rate: (entry.quantity && entry.amount) ? (entry.amount / entry.quantity).toFixed(2) : '',
             slipPhoto: entry.slipPhoto || ''
@@ -467,6 +472,7 @@ const FuelPage = () => {
             'Distance (KM)': e.distance || 0,
             'Mileage (KM/L)': e.mileage || 0,
             'Payment Source': e.paymentSource || 'Office',
+            'Payment By': e.paymentBy || 'N/A',
             'Payment Mode': e.paymentMode,
             'Station': e.stationName || 'N/A',
             'Driver': e.driver || 'N/A',
@@ -492,7 +498,8 @@ const FuelPage = () => {
     const filteredEntries = entries.filter(e => {
         const matchesSearch = (e.vehicle?.carNumber?.toLowerCase()?.includes(searchTerm.toLowerCase()) ||
             e.stationName?.toLowerCase()?.includes(searchTerm.toLowerCase()) ||
-            e.driver?.toLowerCase()?.includes(searchTerm.toLowerCase()));
+            e.driver?.toLowerCase()?.includes(searchTerm.toLowerCase()) ||
+            e.paymentBy?.toLowerCase()?.includes(searchTerm.toLowerCase()));
         const matchesVehicle = filterVehicle === 'All' || e.vehicle?._id === filterVehicle;
         return matchesSearch && matchesVehicle;
     }).sort((a, b) => {
@@ -1288,7 +1295,7 @@ const FuelPage = () => {
 
                                 <div style={{ display: 'flex', gap: '15px', marginTop: '25px' }}>
                                     <button
-                                        onClick={() => handleApproveReject(selectedPending.attendanceId, selectedPending._id, 'approved', { amount: formData.amount, quantity: formData.quantity, rate: formData.rate, odometer: formData.odometer, slipPhoto: formData.slipPhoto, paymentSource: formData.paymentSource })}
+                                        onClick={() => handleApproveReject(selectedPending.attendanceId, selectedPending._id, 'approved', { amount: formData.amount, quantity: formData.quantity, rate: formData.rate, odometer: formData.odometer, slipPhoto: formData.slipPhoto, paymentSource: formData.paymentSource, paymentBy: formData.paymentBy })}
                                         style={{ flex: 2, height: '50px', borderRadius: '12px', fontSize: '15px', fontWeight: '800', background: '#10b981', color: 'white', border: 'none', cursor: 'pointer' }}
                                     >
                                         Confirm Approval
