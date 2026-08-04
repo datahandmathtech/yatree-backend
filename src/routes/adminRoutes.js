@@ -126,6 +126,7 @@ const vehicleUpload = upload.fields([
 ]);
 
 // Shared Routes (Admin & Executive)
+router.put('/company/:companyId/settings', adminOrExecutive, checkCompany, require('../controllers/adminController').updateCompanySettings);
 router.get('/dashboard/:companyId', adminOrExecutive, checkCompany, getDashboardStats);
 router.get('/live-feed/:companyId', adminOrExecutive, checkCompany, getLiveFeed);
 router.get('/live-map/:companyId', adminOrExecutive, checkCompany, getLiveMap);

@@ -157,7 +157,7 @@ const createDriver = async (req, res, next) => {
 // @access  Private/Admin
 const createVehicle = asyncHandler(async (req, res) => {
     console.log('CREATE VEHICLE REQUEST:', { body: req.body, files: req.files ? Object.keys(req.files) : 'no files' });
-    const { carNumber, model, permitType, companyId, carType, isOutsideCar, dutyAmount, buyAmount, fastagNumber, fastagBalance, fastagBank, driverName, dutyType, dutyTime, ownerName, dropLocation, property, eventId, remarks, guestCount, guestName } = req.body;
+    const { carNumber, model, permitType, companyId, carType, isOutsideCar, dutyAmount, buyAmount, fastagNumber, fastagBalance, fastagBank, driverName, dutyType, dutyTime, ownerName, dropLocation, property, eventId, remarks, guestCount, guestName, workBasis } = req.body;
 
     const formattedCarNumber = carNumber.trim().toUpperCase();
     // 🛡️ SECURITY: Global system check for car number uniqueness but restricted by tenant filter for safety.
@@ -213,6 +213,7 @@ const createVehicle = asyncHandler(async (req, res) => {
         dutyType,
         dutyTime,
         ownerName: ownerName,
+        workBasis: workBasis || 'Fix Basis',
         property: property,
         dropLocation: dropLocation,
         eventId: eventId,
@@ -408,6 +409,8 @@ const getDashboardStats = asyncHandler(async (req, res) => {
         const baseMonth = isMonthlyMode ? parseInt(qMonth) : baseDate.month;
         const baseYear = isMonthlyMode ? parseInt(qYear) : baseDate.year;
         const monthPrefix = isMonthlyMode ? `${qYear}-${qMonth.toString().padStart(2, '0')}` : baseDate.toFormat('yyyy-MM');
+        const startMonthStr = isMonthlyMode ? monthPrefix : DateTime.fromJSDate(monthStart).toFormat('yyyy-MM');
+        const endMonthStr = isMonthlyMode ? monthPrefix : DateTime.fromJSDate(monthEnd).toFormat('yyyy-MM');
 
         // CONCURRENT AGGREGATIONS
         const [
@@ -453,13 +456,13 @@ const getDashboardStats = asyncHandler(async (req, res) => {
                 Attendance.find({ company: companyObjectId, status: 'incomplete' }).populate('driver', 'name').populate('vehicle', 'carNumber').sort({ createdAt: -1 }).limit(20).lean()
             ]),
             Promise.all([
-                Vehicle.aggregate([{ $match: { company: companyObjectId, isOutsideCar: true } }, { $project: { month: { $substr: [{ $ifNull: ["$carNumber", ""] }, { $add: [{ $indexOfBytes: ["$carNumber", "#"] }, 1] }, 7] }, isBuy: { $eq: [{ $ifNull: ["$transactionType", "Buy"] }, "Buy"] }, isFleet: { $eq: ["$vehicleSource", "Fleet"] }, costAmount: { $cond: { if: { $and: [{ $eq: [{ $ifNull: ["$transactionType", "Buy"] }, "Buy"] }, { $gt: [{ $ifNull: ["$buyAmount", 0] }, 0] }] }, then: "$buyAmount", else: { $ifNull: ["$dutyAmount", 0] } } }, revenueAmount: { $ifNull: ["$dutyAmount", 0] }, isE: { $gt: [{ $strLenCP: { $toString: { $ifNull: ["$eventId", ""] } } }, 10] } } }, { $facet: { e: [{ $match: { month: monthPrefix, isE: true } }, { $group: { _id: null, t: { $sum: "$revenueAmount" } } }], o: [{ $match: { month: monthPrefix, isBuy: true, isFleet: false } }, { $group: { _id: null, t: { $sum: "$costAmount" } } }] } }]),
+                Vehicle.aggregate([{ $match: { company: companyObjectId, isOutsideCar: true } }, { $project: { month: { $substr: [{ $ifNull: ["$carNumber", ""] }, { $add: [{ $indexOfBytes: ["$carNumber", "#"] }, 1] }, 7] }, isBuy: { $eq: [{ $ifNull: ["$transactionType", "Buy"] }, "Buy"] }, isFleet: { $eq: ["$vehicleSource", "Fleet"] }, costAmount: { $cond: { if: { $and: [{ $eq: [{ $ifNull: ["$transactionType", "Buy"] }, "Buy"] }, { $gt: [{ $ifNull: ["$buyAmount", 0] }, 0] }] }, then: "$buyAmount", else: { $ifNull: ["$dutyAmount", 0] } } }, revenueAmount: { $ifNull: ["$dutyAmount", 0] }, isE: { $gt: [{ $strLenCP: { $toString: { $ifNull: ["$eventId", ""] } } }, 10] } } }, { $facet: { e: [{ $match: { month: { $gte: startMonthStr, $lte: endMonthStr }, isE: true } }, { $group: { _id: null, t: { $sum: "$revenueAmount" } } }], o: [{ $match: { month: { $gte: startMonthStr, $lte: endMonthStr }, isBuy: true, isFleet: false } }, { $group: { _id: null, t: { $sum: "$costAmount" } } }] } }]),
                 AccidentLog.aggregate([{ $match: { company: companyObjectId, date: { $gte: monthStart, $lte: monthEnd } } }, { $group: { _id: null, t: { $sum: '$amount' } } }]),
                 AccidentLog.aggregate([{ $match: { company: companyObjectId, date: { $gte: yStart, $lte: yEnd } } }, { $group: { _id: null, t: { $sum: '$amount' } } }])
             ]),
             Promise.all([
-                getDriverSalarySummaryInternal(companyObjectId, baseMonth, baseYear, false, 'Taxi'),
-                getDriverSalarySummaryInternal(companyObjectId, baseMonth, baseYear, true, 'Taxi'),
+                getDriverSalarySummaryInternal(companyObjectId, baseMonth, baseYear, false, 'Taxi', isRangeMode ? monthStartStr : null, isRangeMode ? monthEndStr : null),
+                getDriverSalarySummaryInternal(companyObjectId, baseMonth, baseYear, true, 'Taxi', isRangeMode ? monthStartStr : null, isRangeMode ? monthEndStr : null),
                 Attendance.find({ company: companyObjectId, date: { $gte: monthStartStr, $lte: monthEndStr } }).select('punchIn.km punchOut.km pendingExpenses driver eventId dailyWage').lean(),
                 User.find({ company: companyObjectId, role: 'Driver' }).select('name mobile isFreelancer tripStatus assignedVehicle').lean(),
                 Vehicle.find({ company: companyObjectId, isOutsideCar: { $ne: true } }).select('carNumber model currentDriver lastOdometer status lastAirCheckDate').lean()
@@ -1212,6 +1215,7 @@ const updateVehicle = asyncHandler(async (req, res) => {
     if (req.body.model) updateData.model = req.body.model;
     if (req.body.permitType) updateData.permitType = req.body.permitType;
     if (req.body.carType) updateData.carType = req.body.carType;
+    if (req.body.workBasis) updateData.workBasis = req.body.workBasis;
     if (req.body.status) updateData.status = req.body.status;
 
     if (req.body.isOutsideCar !== undefined) {
@@ -3410,7 +3414,9 @@ const addFuelEntry = asyncHandler(async (req, res) => {
         paymentSource,
         paymentBy,
         driver,
-        slipPhoto
+        slipPhoto,
+        client,
+        drsDuty
     } = req.body;
 
     if (!vehicleId || !companyId || !fuelType || !amount || !quantity || !odometer) {
@@ -3432,8 +3438,39 @@ const addFuelEntry = asyncHandler(async (req, res) => {
         paymentBy: paymentBy || '',
         driver,
         slipPhoto,
-        createdBy: req.user._id
+        client: client || null,
+        drsDuty: drsDuty || null,
+        createdBy: req.user._id,
+        isDeductedFromLedger: !!client
     });
+
+    // Client Ledger Deduction Logic
+    if (client && (paymentSource === 'Guest / Client' || paymentSource === 'Guest')) {
+        try {
+            const ClientModel = require('../models/Client');
+            const LedgerEntryModel = require('../models/LedgerEntry');
+
+            const clientRecord = await ClientModel.findById(client);
+            if (clientRecord) {
+                // Fuel paid by guest is a payment/credit, so it reduces the balance
+                clientRecord.totalPaid += Number(amount);
+                clientRecord.balance -= Number(amount);
+                await clientRecord.save();
+
+                await LedgerEntryModel.create({
+                    client: client,
+                    company: companyId,
+                    type: 'Fuel',
+                    amount: Number(amount),
+                    description: `Fuel paid by guest (Vehicle: ${vehicleId})`,
+                    referenceId: fuelEntry._id,
+                    date: fuelEntry.date
+                });
+            }
+        } catch(e) {
+            console.error('Ledger Deduction Error:', e);
+        }
+    }
 
     // Try to link to Attendance to prevent duplication in Reports
     try {
@@ -3810,8 +3847,10 @@ const approveRejectExpense = asyncHandler(async (req, res) => {
             
             // PaymentBy (Guest name / Office Payer name)
             const finalPaymentBy = paymentBy !== undefined ? paymentBy : (expense.paymentBy || '');
+            const finalClient = req.body.updates?.client || null;
+            const finalDrsDuty = req.body.updates?.drsDuty || null;
 
-            console.log(`[approveRejectExpense] Creating fuel entry: vehicleId=${vehicleId}, amount=${finalAmount}, qty=${finalQuantity}, rate=${finalRate}, odometer=${finalOdometer}, paymentSource=${finalPaymentSource}, paymentBy=${finalPaymentBy}`);
+            console.log(`[approveRejectExpense] Creating fuel entry: vehicleId=${vehicleId}, amount=${finalAmount}, qty=${finalQuantity}, rate=${finalRate}, odometer=${finalOdometer}, paymentSource=${finalPaymentSource}, paymentBy=${finalPaymentBy}, client=${finalClient}`);
 
             // Dedup check: If admin already entered this fuel manually via Reports or Fuel page
             const existingFuel = await Fuel.findOne({
@@ -3823,15 +3862,18 @@ const approveRejectExpense = asyncHandler(async (req, res) => {
                 ]
             });
 
+            let fuelEntry = null;
+
             if (existingFuel) {
                 console.log(`[approveRejectExpense] Fuel record already exists (Deduplicated): ${existingFuel._id}`);
                 if (!existingFuel.attendance) {
                     existingFuel.attendance = attendanceId;
                     await existingFuel.save();
                 }
+                fuelEntry = existingFuel;
             } else {
                 // 1. Add to Fuel Collection
-                await Fuel.create({
+                fuelEntry = await Fuel.create({
                     vehicle: vehicleId,
                     company: attendance.company,
                     fuelType: expense.fuelType || 'Diesel',
@@ -3842,6 +3884,9 @@ const approveRejectExpense = asyncHandler(async (req, res) => {
                     odometer: finalOdometer,
                     paymentSource: finalPaymentSource,
                     paymentBy: finalPaymentBy,
+                    client: finalClient,
+                    drsDuty: finalDrsDuty,
+                    isDeductedFromLedger: !!finalClient,
                     driver: driverName,
                     createdBy: req.user._id,
                     source: 'Driver',
@@ -3849,6 +3894,33 @@ const approveRejectExpense = asyncHandler(async (req, res) => {
                     slipPhoto: finalSlipPhoto,
                     attendance: attendanceId
                 });
+
+                // Client Ledger Deduction Logic
+                if (finalClient && finalPaymentSource === 'Guest') {
+                    try {
+                        const ClientModel = require('../models/Client');
+                        const LedgerEntryModel = require('../models/LedgerEntry');
+
+                        const clientRecord = await ClientModel.findById(finalClient);
+                        if (clientRecord) {
+                            clientRecord.totalPaid += Number(finalAmount);
+                            clientRecord.balance -= Number(finalAmount);
+                            await clientRecord.save();
+
+                            await LedgerEntryModel.create({
+                                client: finalClient,
+                                company: attendance.company,
+                                type: 'Fuel',
+                                amount: Number(finalAmount),
+                                description: `Fuel paid by guest (Vehicle: ${vehicleId})`,
+                                referenceId: fuelEntry._id,
+                                date: fuelEntry.date
+                            });
+                        }
+                    } catch(e) {
+                        console.error('Ledger Deduction Error on Approve:', e);
+                    }
+                }
             }
 
             // Recalculate chain to ensure perfect mileage
@@ -4171,7 +4243,7 @@ const deleteAllowance = asyncHandler(async (req, res) => {
     res.json({ message: 'Allowance deleted' });
 });
 
-const getDriverSalarySummaryInternal = async (companyId, month, year, isFreelancerOnly = false, driverType = 'Taxi') => {
+const getDriverSalarySummaryInternal = async (companyId, month, year, isFreelancerOnly = false, driverType = 'Taxi', rangeStartStr = null, rangeEndStr = null) => {
     // 1. Get all drivers in company
     const driverQuery = {
         company: companyId,
@@ -4206,7 +4278,12 @@ const getDriverSalarySummaryInternal = async (companyId, month, year, isFreelanc
 
     // 2. Prepare Date range
     let startStr, endStr, startJS, endJS;
-    if (month && year) {
+    if (rangeStartStr && rangeEndStr) {
+        startStr = rangeStartStr;
+        endStr = rangeEndStr;
+        startJS = new Date(startStr);
+        endJS = new Date(endStr + 'T23:59:59.999Z');
+    } else if (month && year) {
         try {
             const startOfMonth = DateTime.fromObject({ year: parseInt(year), month: parseInt(month), day: 1 }, { zone: 'Asia/Kolkata' }).startOf('month');
             const endOfMonth = startOfMonth.endOf('month');
@@ -7224,6 +7301,28 @@ const getLiveMap = asyncHandler(async (req, res) => {
     res.json({ success: true, liveVehicles });
 });
 
+// @desc    Update Company Settings
+// @route   PUT /api/admin/company/:companyId/settings
+// @access  Private/AdminOrExecutive
+const updateCompanySettings = asyncHandler(async (req, res) => {
+    const { gstRate, gstNumber, name, whatsappNumber } = req.body;
+    const Company = require('../models/Company');
+    const company = await Company.findById(req.params.companyId);
+    
+    if (!company) {
+        res.status(404);
+        throw new Error('Company not found');
+    }
+
+    if (gstRate !== undefined) company.gstRate = Number(gstRate);
+    if (gstNumber !== undefined) company.gstNumber = gstNumber;
+    if (name !== undefined) company.name = name;
+    if (whatsappNumber !== undefined) company.whatsappNumber = whatsappNumber;
+
+    await company.save();
+    res.json(company);
+});
+
 module.exports = { getDriverSalarySummaryInternal,
     getLiveMap,
     resolveAirCheck,
@@ -7314,5 +7413,6 @@ module.exports = { getDriverSalarySummaryInternal,
     createLoan,
     updateLoan,
     deleteLoan,
-    recordLoanRepayment
+    recordLoanRepayment,
+    updateCompanySettings
 };

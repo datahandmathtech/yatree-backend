@@ -1,33 +1,17 @@
-const mongoose = require('mongoose');
-const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '../backend/.env') });
+const { MongoClient } = require('mongodb');
+require('dotenv').config();
 
-async function checkDatabase() {
-    try {
-        await mongoose.connect(process.env.MONGODB_URI);
-        const collections = ['vehicles', 'attendances', 'fuels', 'maintenances', 'advances'];
-        
-        for (const colName of collections) {
-            const Model = mongoose.model(colName, new mongoose.Schema({}, { strict: false }), colName);
-            const all = await Model.find({});
-            
-            const counts = {};
-            all.forEach(doc => {
-                const dateVal = doc.date || doc.billDate || doc.createdAt;
-                if (!dateVal) return;
-                const d = new Date(dateVal);
-                const key = `${d.getFullYear()}-${d.getMonth() + 1}`;
-                counts[key] = (counts[key] || 0) + 1;
-            });
-            console.log(`--- ${colName} ---`);
-            console.log(counts);
-        }
-
-    } catch (err) {
-        console.error(err);
-    } finally {
-        await mongoose.disconnect();
+async function run() {
+    const client = new MongoClient(process.env.MONGODB_URI);
+    await client.connect();
+    const db = client.db();
+    const vehicle = await db.collection('vehicles').find({'documents': {$ne: []}}).sort({_id: -1}).limit(1).toArray();
+    if (vehicle.length > 0) {
+        console.log("Documents:", JSON.stringify(vehicle[0].documents, null, 2));
+    } else {
+        console.log("No vehicle with documents found.");
     }
+    await client.close();
 }
 
-checkDatabase();
+run();

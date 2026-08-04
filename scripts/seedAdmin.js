@@ -15,13 +15,13 @@ const seed = async () => {
         }
 
         // Create Admin
-        const adminMobile = 'admin_user_1';
+        const adminMobile = '@abhinandan';
         const targetCompany = await Company.findOne({ name: 'PrimaryFleet' });
         
         const adminData = {
             name: 'System Admin',
             mobile: adminMobile,
-            password: '@2526Bigday',
+            password: '@9822Abhi',
             role: 'SuperAdmin',
             company: targetCompany ? targetCompany._id : null
         };

@@ -134,6 +134,11 @@ const vehicleSchema = new mongoose.Schema({
         ref: 'User',
         default: null
     },
+    workBasis: {
+        type: String,
+        enum: ['Fix Basis', 'Daily Basis'],
+        default: 'Fix Basis'
+    },
     // Advanced Billing
     billingDetails: {
         serviceName: { type: String },
