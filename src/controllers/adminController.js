@@ -604,29 +604,7 @@ const getDashboardStats = asyncHandler(async (req, res) => {
             }
         });
         
-        // Tire Air Check Logic
-        const now = new Date();
-        const dayOfWeek = now.getDay(); // 0 is Sunday, 1 is Monday
-        const daysSinceMonday = (dayOfWeek + 6) % 7; 
-        const lastMonday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysSinceMonday);
-        lastMonday.setHours(0, 0, 0, 0);
-        
-        allV.forEach(v => {
-            if (v.status === 'active') {
-                if (!v.lastAirCheckDate || new Date(v.lastAirCheckDate) < lastMonday) {
-                    const driverName = v.currentDriver ? v.currentDriver.name : 'Not Punched In'; console.log('AIRCHECK DEBUG:', v.carNumber, v.status, v.lastAirCheckDate);
-                    alerts.push({
-                        type: 'AirCheck',
-                        id: v._id,
-                        identifier: v.carNumber,
-                        documentType: `Tire Air Check (Driver: ${driverName})`,
-                        status: 'Overdue',
-                        daysLeft: 0,
-                        expiryDate: lastMonday
-                    });
-                }
-            }
-        });
+        // Tire Air Check logic has been removed as per user request
 
         const activeBorderTaxes = await BorderTax.find({
             company: companyObjectId,
