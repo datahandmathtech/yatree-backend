@@ -58,6 +58,20 @@ const fuelSchema = new mongoose.Schema({
     paymentBy: {
         type: String
     },
+    client: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Client',
+        default: null
+    },
+    drsDuty: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'DRSDuty',
+        default: null
+    },
+    isDeductedFromLedger: {
+        type: Boolean,
+        default: false
+    },
     // Calculated Fields
     distance: {
         type: Number,

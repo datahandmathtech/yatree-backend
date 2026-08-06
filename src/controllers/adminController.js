@@ -3360,35 +3360,45 @@ const deleteMaintenanceRecord = asyncHandler(async (req, res) => {
 
 // Helper to recalculate fuel metrics using the "Previous Fill" logic
 const recalculateFuelMetrics = async (vehicleId) => {
-    const entries = await Fuel.find({ vehicle: vehicleId }).sort({ odometer: 1, date: 1 });
+    const entries = await Fuel.find({ vehicle: vehicleId }).sort({ odometer: 1, date: 1 }).lean();
     let prevOdometer = null;
     let prevQuantity = null;
     let prevAmount = null;
     let prevRate = null;
 
-    for (const entry of entries) {
-        if (prevOdometer === null) {
-            entry.distance = 0;
-            entry.mileage = 0;
-            entry.costPerKm = 0;
-        } else {
-            entry.distance = entry.odometer - prevOdometer;
+    const bulkOps = [];
 
-            if (entry.distance > 0 && prevQuantity > 0) {
+    for (const entry of entries) {
+        let distance = 0;
+        let mileage = 0;
+        let costPerKm = 0;
+
+        if (prevOdometer !== null) {
+            distance = entry.odometer - prevOdometer;
+
+            if (distance > 0 && prevQuantity > 0) {
                 // Mileage = Distance covered / Fuel added at the START of this trip (prev entry)
-                entry.mileage = Number((entry.distance / prevQuantity).toFixed(2));
+                mileage = Number((distance / prevQuantity).toFixed(2));
                 // Cost/KM = Previous Amount / Distance covered
-                entry.costPerKm = Number((prevAmount / entry.distance).toFixed(2));
-            } else {
-                entry.mileage = 0;
-                entry.costPerKm = 0;
+                costPerKm = Number((prevAmount / distance).toFixed(2));
             }
         }
-        await entry.save();
+
+        bulkOps.push({
+            updateOne: {
+                filter: { _id: entry._id },
+                update: { $set: { distance, mileage, costPerKm } }
+            }
+        });
+
         prevOdometer = entry.odometer;
         prevQuantity = entry.quantity;
         prevAmount = entry.amount;
         prevRate = entry.rate;
+    }
+
+    if (bulkOps.length > 0) {
+        await Fuel.bulkWrite(bulkOps);
     }
 };
 
@@ -3410,7 +3420,9 @@ const addFuelEntry = asyncHandler(async (req, res) => {
         paymentSource,
         paymentBy,
         driver,
-        slipPhoto
+        slipPhoto,
+        client,
+        drsDuty
     } = req.body;
 
     if (!vehicleId || !companyId || !fuelType || !amount || !quantity || !odometer) {
@@ -3432,8 +3444,39 @@ const addFuelEntry = asyncHandler(async (req, res) => {
         paymentBy: paymentBy || '',
         driver,
         slipPhoto,
-        createdBy: req.user._id
+        client: client || null,
+        drsDuty: drsDuty || null,
+        createdBy: req.user._id,
+        isDeductedFromLedger: !!client
     });
+
+    // Client Ledger Deduction Logic
+    if (client && (paymentSource === 'Guest / Client' || paymentSource === 'Guest')) {
+        try {
+            const ClientModel = require('../models/Client');
+            const LedgerEntryModel = require('../models/LedgerEntry');
+
+            const clientRecord = await ClientModel.findById(client);
+            if (clientRecord) {
+                // Fuel paid by guest is a payment/credit, so it reduces the balance
+                clientRecord.totalPaid += Number(amount);
+                clientRecord.balance -= Number(amount);
+                await clientRecord.save();
+
+                await LedgerEntryModel.create({
+                    client: client,
+                    company: companyId,
+                    type: 'Fuel',
+                    amount: Number(amount),
+                    description: `Fuel paid by guest (Vehicle: ${vehicleId})`,
+                    referenceId: fuelEntry._id,
+                    date: fuelEntry.date
+                });
+            }
+        } catch(e) {
+            console.error('Ledger Deduction Error:', e);
+        }
+    }
 
     // Try to link to Attendance to prevent duplication in Reports
     try {
@@ -3810,8 +3853,10 @@ const approveRejectExpense = asyncHandler(async (req, res) => {
             
             // PaymentBy (Guest name / Office Payer name)
             const finalPaymentBy = paymentBy !== undefined ? paymentBy : (expense.paymentBy || '');
+            const finalClient = req.body.updates?.client || null;
+            const finalDrsDuty = req.body.updates?.drsDuty || null;
 
-            console.log(`[approveRejectExpense] Creating fuel entry: vehicleId=${vehicleId}, amount=${finalAmount}, qty=${finalQuantity}, rate=${finalRate}, odometer=${finalOdometer}, paymentSource=${finalPaymentSource}, paymentBy=${finalPaymentBy}`);
+            console.log(`[approveRejectExpense] Creating fuel entry: vehicleId=${vehicleId}, amount=${finalAmount}, qty=${finalQuantity}, rate=${finalRate}, odometer=${finalOdometer}, paymentSource=${finalPaymentSource}, paymentBy=${finalPaymentBy}, client=${finalClient}`);
 
             // Dedup check: If admin already entered this fuel manually via Reports or Fuel page
             const existingFuel = await Fuel.findOne({
@@ -3823,15 +3868,18 @@ const approveRejectExpense = asyncHandler(async (req, res) => {
                 ]
             });
 
+            let fuelEntry = null;
+
             if (existingFuel) {
                 console.log(`[approveRejectExpense] Fuel record already exists (Deduplicated): ${existingFuel._id}`);
                 if (!existingFuel.attendance) {
                     existingFuel.attendance = attendanceId;
                     await existingFuel.save();
                 }
+                fuelEntry = existingFuel;
             } else {
                 // 1. Add to Fuel Collection
-                await Fuel.create({
+                fuelEntry = await Fuel.create({
                     vehicle: vehicleId,
                     company: attendance.company,
                     fuelType: expense.fuelType || 'Diesel',
@@ -3842,6 +3890,9 @@ const approveRejectExpense = asyncHandler(async (req, res) => {
                     odometer: finalOdometer,
                     paymentSource: finalPaymentSource,
                     paymentBy: finalPaymentBy,
+                    client: finalClient,
+                    drsDuty: finalDrsDuty,
+                    isDeductedFromLedger: !!finalClient,
                     driver: driverName,
                     createdBy: req.user._id,
                     source: 'Driver',
@@ -3849,6 +3900,33 @@ const approveRejectExpense = asyncHandler(async (req, res) => {
                     slipPhoto: finalSlipPhoto,
                     attendance: attendanceId
                 });
+
+                // Client Ledger Deduction Logic
+                if (finalClient && finalPaymentSource === 'Guest') {
+                    try {
+                        const ClientModel = require('../models/Client');
+                        const LedgerEntryModel = require('../models/LedgerEntry');
+
+                        const clientRecord = await ClientModel.findById(finalClient);
+                        if (clientRecord) {
+                            clientRecord.totalPaid += Number(finalAmount);
+                            clientRecord.balance -= Number(finalAmount);
+                            await clientRecord.save();
+
+                            await LedgerEntryModel.create({
+                                client: finalClient,
+                                company: attendance.company,
+                                type: 'Fuel',
+                                amount: Number(finalAmount),
+                                description: `Fuel paid by guest (Vehicle: ${vehicleId})`,
+                                referenceId: fuelEntry._id,
+                                date: fuelEntry.date
+                            });
+                        }
+                    } catch(e) {
+                        console.error('Ledger Deduction Error on Approve:', e);
+                    }
+                }
             }
 
             // Recalculate chain to ensure perfect mileage
@@ -7224,6 +7302,28 @@ const getLiveMap = asyncHandler(async (req, res) => {
     res.json({ success: true, liveVehicles });
 });
 
+// @desc    Update Company Settings
+// @route   PUT /api/admin/company/:companyId/settings
+// @access  Private/AdminOrExecutive
+const updateCompanySettings = asyncHandler(async (req, res) => {
+    const { gstRate, gstNumber, name, whatsappNumber } = req.body;
+    const Company = require('../models/Company');
+    const company = await Company.findById(req.params.companyId);
+    
+    if (!company) {
+        res.status(404);
+        throw new Error('Company not found');
+    }
+
+    if (gstRate !== undefined) company.gstRate = Number(gstRate);
+    if (gstNumber !== undefined) company.gstNumber = gstNumber;
+    if (name !== undefined) company.name = name;
+    if (whatsappNumber !== undefined) company.whatsappNumber = whatsappNumber;
+
+    await company.save();
+    res.json(company);
+});
+
 module.exports = { getDriverSalarySummaryInternal,
     getLiveMap,
     resolveAirCheck,
@@ -7314,5 +7414,6 @@ module.exports = { getDriverSalarySummaryInternal,
     createLoan,
     updateLoan,
     deleteLoan,
-    recordLoanRepayment
+    recordLoanRepayment,
+    updateCompanySettings
 };
