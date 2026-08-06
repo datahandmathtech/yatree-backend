@@ -157,7 +157,7 @@ const createDriver = async (req, res, next) => {
 // @access  Private/Admin
 const createVehicle = asyncHandler(async (req, res) => {
     console.log('CREATE VEHICLE REQUEST:', { body: req.body, files: req.files ? Object.keys(req.files) : 'no files' });
-    const { carNumber, model, permitType, companyId, carType, isOutsideCar, dutyAmount, buyAmount, fastagNumber, fastagBalance, fastagBank, driverName, dutyType, dutyTime, ownerName, dropLocation, property, eventId, remarks, guestCount, guestName } = req.body;
+    const { carNumber, model, permitType, companyId, carType, isOutsideCar, dutyAmount, buyAmount, fastagNumber, fastagBalance, fastagBank, driverName, dutyType, dutyTime, ownerName, dropLocation, property, eventId, remarks, guestCount, guestName, workBasis } = req.body;
 
     const formattedCarNumber = carNumber.trim().toUpperCase();
     // 🛡️ SECURITY: Global system check for car number uniqueness but restricted by tenant filter for safety.
@@ -213,6 +213,7 @@ const createVehicle = asyncHandler(async (req, res) => {
         dutyType,
         dutyTime,
         ownerName: ownerName,
+        workBasis: workBasis || 'Fix Basis',
         property: property,
         dropLocation: dropLocation,
         eventId: eventId,
@@ -408,6 +409,8 @@ const getDashboardStats = asyncHandler(async (req, res) => {
         const baseMonth = isMonthlyMode ? parseInt(qMonth) : baseDate.month;
         const baseYear = isMonthlyMode ? parseInt(qYear) : baseDate.year;
         const monthPrefix = isMonthlyMode ? `${qYear}-${qMonth.toString().padStart(2, '0')}` : baseDate.toFormat('yyyy-MM');
+        const startMonthStr = isMonthlyMode ? monthPrefix : DateTime.fromJSDate(monthStart).toFormat('yyyy-MM');
+        const endMonthStr = isMonthlyMode ? monthPrefix : DateTime.fromJSDate(monthEnd).toFormat('yyyy-MM');
 
         // CONCURRENT AGGREGATIONS
         const [
@@ -453,13 +456,13 @@ const getDashboardStats = asyncHandler(async (req, res) => {
                 Attendance.find({ company: companyObjectId, status: 'incomplete' }).populate('driver', 'name').populate('vehicle', 'carNumber').sort({ createdAt: -1 }).limit(20).lean()
             ]),
             Promise.all([
-                Vehicle.aggregate([{ $match: { company: companyObjectId, isOutsideCar: true } }, { $project: { month: { $substr: [{ $ifNull: ["$carNumber", ""] }, { $add: [{ $indexOfBytes: ["$carNumber", "#"] }, 1] }, 7] }, isBuy: { $eq: [{ $ifNull: ["$transactionType", "Buy"] }, "Buy"] }, isFleet: { $eq: ["$vehicleSource", "Fleet"] }, costAmount: { $cond: { if: { $and: [{ $eq: [{ $ifNull: ["$transactionType", "Buy"] }, "Buy"] }, { $gt: [{ $ifNull: ["$buyAmount", 0] }, 0] }] }, then: "$buyAmount", else: { $ifNull: ["$dutyAmount", 0] } } }, revenueAmount: { $ifNull: ["$dutyAmount", 0] }, isE: { $gt: [{ $strLenCP: { $toString: { $ifNull: ["$eventId", ""] } } }, 10] } } }, { $facet: { e: [{ $match: { month: monthPrefix, isE: true } }, { $group: { _id: null, t: { $sum: "$revenueAmount" } } }], o: [{ $match: { month: monthPrefix, isBuy: true, isFleet: false } }, { $group: { _id: null, t: { $sum: "$costAmount" } } }] } }]),
+                Vehicle.aggregate([{ $match: { company: companyObjectId, isOutsideCar: true } }, { $project: { month: { $substr: [{ $ifNull: ["$carNumber", ""] }, { $add: [{ $indexOfBytes: ["$carNumber", "#"] }, 1] }, 7] }, isBuy: { $eq: [{ $ifNull: ["$transactionType", "Buy"] }, "Buy"] }, isFleet: { $eq: ["$vehicleSource", "Fleet"] }, costAmount: { $cond: { if: { $and: [{ $eq: [{ $ifNull: ["$transactionType", "Buy"] }, "Buy"] }, { $gt: [{ $ifNull: ["$buyAmount", 0] }, 0] }] }, then: "$buyAmount", else: { $ifNull: ["$dutyAmount", 0] } } }, revenueAmount: { $ifNull: ["$dutyAmount", 0] }, isE: { $gt: [{ $strLenCP: { $toString: { $ifNull: ["$eventId", ""] } } }, 10] } } }, { $facet: { e: [{ $match: { month: { $gte: startMonthStr, $lte: endMonthStr }, isE: true } }, { $group: { _id: null, t: { $sum: "$revenueAmount" } } }], o: [{ $match: { month: { $gte: startMonthStr, $lte: endMonthStr }, isBuy: true, isFleet: false } }, { $group: { _id: null, t: { $sum: "$costAmount" } } }] } }]),
                 AccidentLog.aggregate([{ $match: { company: companyObjectId, date: { $gte: monthStart, $lte: monthEnd } } }, { $group: { _id: null, t: { $sum: '$amount' } } }]),
                 AccidentLog.aggregate([{ $match: { company: companyObjectId, date: { $gte: yStart, $lte: yEnd } } }, { $group: { _id: null, t: { $sum: '$amount' } } }])
             ]),
             Promise.all([
-                getDriverSalarySummaryInternal(companyObjectId, baseMonth, baseYear, false, 'Taxi'),
-                getDriverSalarySummaryInternal(companyObjectId, baseMonth, baseYear, true, 'Taxi'),
+                getDriverSalarySummaryInternal(companyObjectId, baseMonth, baseYear, false, 'Taxi', isRangeMode ? monthStartStr : null, isRangeMode ? monthEndStr : null),
+                getDriverSalarySummaryInternal(companyObjectId, baseMonth, baseYear, true, 'Taxi', isRangeMode ? monthStartStr : null, isRangeMode ? monthEndStr : null),
                 Attendance.find({ company: companyObjectId, date: { $gte: monthStartStr, $lte: monthEndStr } }).select('punchIn.km punchOut.km pendingExpenses driver eventId dailyWage').lean(),
                 User.find({ company: companyObjectId, role: 'Driver' }).select('name mobile isFreelancer tripStatus assignedVehicle').lean(),
                 Vehicle.find({ company: companyObjectId, isOutsideCar: { $ne: true } }).select('carNumber model currentDriver lastOdometer status lastAirCheckDate').lean()
@@ -601,29 +604,7 @@ const getDashboardStats = asyncHandler(async (req, res) => {
             }
         });
         
-        // Tire Air Check Logic
-        const now = new Date();
-        const dayOfWeek = now.getDay(); // 0 is Sunday, 1 is Monday
-        const daysSinceMonday = (dayOfWeek + 6) % 7; 
-        const lastMonday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysSinceMonday);
-        lastMonday.setHours(0, 0, 0, 0);
-        
-        allV.forEach(v => {
-            if (v.status === 'active') {
-                if (!v.lastAirCheckDate || new Date(v.lastAirCheckDate) < lastMonday) {
-                    const driverName = v.currentDriver ? v.currentDriver.name : 'Not Punched In'; console.log('AIRCHECK DEBUG:', v.carNumber, v.status, v.lastAirCheckDate);
-                    alerts.push({
-                        type: 'AirCheck',
-                        id: v._id,
-                        identifier: v.carNumber,
-                        documentType: `Tire Air Check (Driver: ${driverName})`,
-                        status: 'Overdue',
-                        daysLeft: 0,
-                        expiryDate: lastMonday
-                    });
-                }
-            }
-        });
+        // Tire Air Check logic has been removed as per user request
 
         const activeBorderTaxes = await BorderTax.find({
             company: companyObjectId,
@@ -1212,6 +1193,7 @@ const updateVehicle = asyncHandler(async (req, res) => {
     if (req.body.model) updateData.model = req.body.model;
     if (req.body.permitType) updateData.permitType = req.body.permitType;
     if (req.body.carType) updateData.carType = req.body.carType;
+    if (req.body.workBasis) updateData.workBasis = req.body.workBasis;
     if (req.body.status) updateData.status = req.body.status;
 
     if (req.body.isOutsideCar !== undefined) {
@@ -4249,7 +4231,7 @@ const deleteAllowance = asyncHandler(async (req, res) => {
     res.json({ message: 'Allowance deleted' });
 });
 
-const getDriverSalarySummaryInternal = async (companyId, month, year, isFreelancerOnly = false, driverType = 'Taxi') => {
+const getDriverSalarySummaryInternal = async (companyId, month, year, isFreelancerOnly = false, driverType = 'Taxi', rangeStartStr = null, rangeEndStr = null) => {
     // 1. Get all drivers in company
     const driverQuery = {
         company: companyId,
@@ -4284,7 +4266,12 @@ const getDriverSalarySummaryInternal = async (companyId, month, year, isFreelanc
 
     // 2. Prepare Date range
     let startStr, endStr, startJS, endJS;
-    if (month && year) {
+    if (rangeStartStr && rangeEndStr) {
+        startStr = rangeStartStr;
+        endStr = rangeEndStr;
+        startJS = new Date(startStr);
+        endJS = new Date(endStr + 'T23:59:59.999Z');
+    } else if (month && year) {
         try {
             const startOfMonth = DateTime.fromObject({ year: parseInt(year), month: parseInt(month), day: 1 }, { zone: 'Asia/Kolkata' }).startOf('month');
             const endOfMonth = startOfMonth.endOf('month');
