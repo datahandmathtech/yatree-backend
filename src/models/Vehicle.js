@@ -1,0 +1,203 @@
+const mongoose = require('mongoose');
+
+const vehicleSchema = new mongoose.Schema({
+    carNumber: {
+        type: String,
+        required: true,
+        unique: true
+    },
+    model: {
+        type: String,
+        required: true
+    },
+    permitType: {
+        type: String,
+        required: true
+    },
+    company: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Company',
+        required: true
+    },
+    currentDriver: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: false,
+        default: null
+    },
+    status: {
+        type: String,
+        enum: ['active', 'inactive'],
+        default: 'active'
+    },
+    carType: {
+        type: String,
+        enum: ['SUV', 'Sedan', 'Hatchback', 'Bus', 'Mini Bus', 'Traveler', 'Electric Vehicle', 'Other'],
+        default: 'SUV'
+    },
+    isOutsideCar: {
+        type: Boolean,
+        default: false
+    },
+    driverName: {
+        type: String // For outside cars
+    },
+    dutyType: {
+        type: String // For outside cars
+    },
+    ownerName: {
+        type: String // For outside cars
+    },
+    dutyAmount: {
+        type: Number,
+        default: 0
+    },
+    buyAmount: {
+        type: Number,
+        default: 0
+    },
+    property: {
+        type: String // For outside cars: Client/Property name (e.g. Hotel Taj)
+    },
+    dropLocation: {
+        type: String // For outside cars
+    },
+    remarks: {
+        type: String // For outside cars / event duties
+    },
+    guestCount: {
+        type: Number,
+        default: 0
+    },
+    guestName: {
+        type: String
+    },
+    dutyTime: {
+        type: String // For outside cars: e.g. "08:00 AM", "Night Shift"
+    },
+    transactionType: {
+        type: String,
+        enum: ['Duty', 'Buy', 'Sell'],
+        default: 'Duty'
+    },
+    vehicleSource: {
+        type: String, // 'Fleet' or 'External'
+        default: 'External'
+    },
+    eventId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Event',
+        required: false
+    },
+    fastagNumber: {
+        type: String
+    },
+    fastagBank: {
+        type: String // e.g., ICICI, Paytm
+    },
+    fastagBalance: {
+        type: Number,
+        default: 0
+    },
+    fastagHistory: [{
+        amount: { type: Number, required: true },
+        date: { type: Date, default: Date.now },
+        method: { type: String }, // e.g., ICICI Bank, UPI, etc.
+        remarks: { type: String },
+        receiptPhoto: { type: String }
+    }],
+    documents: [{
+        documentType: {
+            type: String,
+            enum: ['RC', 'PUC', 'FITNESS', 'PERMIT', 'INSURANCE'],
+            required: true
+        },
+        imageUrl: {
+            type: String,
+            required: true
+        },
+        expiryDate: {
+            type: Date,
+            required: true
+        }
+    }],
+    lastOdometer: {
+        type: Number,
+        default: 0
+    },
+    lastAirCheckDate: {
+        type: Date,
+        default: null
+    },
+    lastAirCheckedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+    },
+    workBasis: {
+        type: String,
+        enum: ['Fix Basis', 'Daily Basis'],
+        default: 'Fix Basis'
+    },
+    // Advanced Billing
+    billingDetails: {
+        serviceName: { type: String },
+        baseRate: { type: Number, default: 0 },
+        baseKms: { type: Number, default: 0 },
+        baseHours: { type: Number, default: 0 },
+        extraKmRate: { type: Number, default: 0 },
+        extraHourRate: { type: Number, default: 0 },
+        driverAllowanceRate: { type: Number, default: 0 },
+        
+        // Calculated post-duty
+        actualKms: { type: Number, default: 0 },
+        actualHours: { type: Number, default: 0 },
+        extraKms: { type: Number, default: 0 },
+        extraHours: { type: Number, default: 0 },
+        extraKmAmount: { type: Number, default: 0 },
+        extraHourAmount: { type: Number, default: 0 },
+        driverAllowanceAmount: { type: Number, default: 0 },
+        totalBilledAmount: { type: Number, default: 0 }
+    }
+}, {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+});
+
+// Indexes for faster dashboard queries
+vehicleSchema.index({ company: 1, isOutsideCar: 1 });
+vehicleSchema.index({ "fastagHistory.date": 1 });
+vehicleSchema.index({ isOutsideCar: 1 });
+// Indexes for faster dashboard and listing queries
+vehicleSchema.index({ company: 1, status: 1 }); // Added compound index for company and status
+vehicleSchema.index({ company: 1, carType: 1 }); // Added compound index for company and carType
+
+// Virtual for document statuses
+vehicleSchema.virtual('documentStatuses').get(function () {
+    if (!this.documents) return [];
+
+    const now = new Date();
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(now.getDate() + 30);
+
+    return this.documents.map(doc => {
+        let status = 'Valid';
+        if (doc.expiryDate < now) {
+            status = 'Expired';
+        } else if (doc.expiryDate <= thirtyDaysFromNow) {
+            status = 'Expiring Soon';
+        }
+        return {
+            documentType: doc.documentType,
+            status
+        };
+    });
+});
+
+// Indexes for performance optimization
+vehicleSchema.index({ eventId: 1 });
+vehicleSchema.index({ company: 1, isOutsideCar: 1 });
+vehicleSchema.index({ currentDriver: 1 });
+
+module.exports = mongoose.model('Vehicle', vehicleSchema);

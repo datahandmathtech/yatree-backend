@@ -1,0 +1,1 @@
+const mongoose = require('mongoose'); require('dotenv').config(); mongoose.connect(process.env.MONGODB_URI).then(async () => { const Fuel = require('../src/models/Fuel'); const res = await Fuel.deleteMany({ createdAt: { $gt: new Date(Date.now() - 30 * 60 * 1000) } }); console.log('Deleted', res.deletedCount); process.exit(0); });

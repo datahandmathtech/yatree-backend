@@ -1,0 +1,78 @@
+[2026-08-07T06:39:43.579Z] CRON: Cron Jobs Initialized
+[2026-08-07T06:40:22.098Z] CRON: Cron Jobs Initialized
+[2026-08-07T06:47:39.836Z] CRON: Cron Jobs Initialized
+[2026-08-07T06:53:00.938Z] CRON: Cron Jobs Initialized
+[2026-08-08T18:23:31.550Z] CRON: Cron Jobs Initialized
+[2026-08-08T18:25:56.322Z] Login attempt started
+[2026-08-08T18:25:56.324Z] Login request for: Gopal123
+[2026-08-08T18:25:57.589Z] User found: Gopal Audichiy (Role: Driver)
+[2026-08-08T18:25:57.827Z] Match debug: receivedPwdLen=10, dbHashStart=$2a$10$M5k, isMatch=true
+[2026-08-08T18:25:57.829Z] Password matched
+[2026-08-08T18:25:57.830Z] DEBUG: Company status in DB is: "active" (Normalized: "active")
+[2026-08-08T18:25:59.293Z] DRIVER_CTRL: getDriverDashboard - User: 6993463109a83283ae7365ae, Company: 698ac8b01587e01651a49443
+[2026-08-08T18:26:00.999Z] DRIVER_CTRL: getDriverDashboard - User: 6993463109a83283ae7365ae, Comp: 698ac8b01587e01651a49443, Found: 12 vehicles
+[2026-08-08T18:26:02.214Z] DRIVER_CTRL: getDriverDashboard - Final Status: completed, Current Car: RJ-27-TA-9821
+[2026-08-08T18:39:57.589Z] Login attempt started
+[2026-08-08T18:39:57.592Z] Login request for: kailash123
+[2026-08-08T18:39:58.745Z] User found: Kailash Bhatt (Role: Driver)
+[2026-08-08T18:39:58.911Z] Match debug: receivedPwdLen=10, dbHashStart=$2a$10$.7n, isMatch=true
+[2026-08-08T18:39:58.913Z] Password matched
+[2026-08-08T18:39:58.914Z] DEBUG: Company status in DB is: "active" (Normalized: "active")
+[2026-08-08T18:40:02.416Z] DRIVER_CTRL: getDriverDashboard - User: 699296b6a94eda1844b175db, Company: 698ac8b01587e01651a49443
+[2026-08-08T18:40:03.045Z] DRIVER_CTRL: getDriverDashboard - User: 699296b6a94eda1844b175db, Comp: 698ac8b01587e01651a49443, Found: 12 vehicles
+[2026-08-08T18:40:04.576Z] DRIVER_CTRL: getDriverDashboard - Final Status: approved, Current Car: RJ-27-TA-9836
+[2026-08-08T19:39:01.308Z] CRON: Cron Jobs Initialized
+[2026-08-08T19:39:30.932Z] Login attempt started
+[2026-08-08T19:39:30.935Z] Login request for: Kavishuser1
+[2026-08-08T19:39:32.461Z] User found: Yatree (Role: Admin)
+[2026-08-08T19:39:32.695Z] Match debug: receivedPwdLen=11, dbHashStart=$2a$10$SZI, isMatch=true
+[2026-08-08T19:39:32.699Z] Password matched
+[2026-08-08T19:39:32.701Z] DEBUG: Company status in DB is: "active" (Normalized: "active")
+[2026-08-08T19:54:07.329Z] CRON: Cron Jobs Initialized
+[2026-08-08T20:13:16.880Z] CRON: Cron Jobs Initialized
+[2026-08-08T20:27:21.429Z] Login attempt started
+[2026-08-08T20:27:21.435Z] Login request for: Gopal123
+[2026-08-08T20:27:21.700Z] User found: Gopal Audichiy (Role: Driver)
+[2026-08-08T20:27:21.891Z] Match debug: receivedPwdLen=10, dbHashStart=$2a$10$M5k, isMatch=true
+[2026-08-08T20:27:21.891Z] Password matched
+[2026-08-08T20:27:21.892Z] DEBUG: Company status in DB is: "active" (Normalized: "active")
+[2026-08-08T20:27:23.169Z] DRIVER_CTRL: getDriverDashboard - User: 6993463109a83283ae7365ae, Company: 698ac8b01587e01651a49443
+[2026-08-08T20:27:23.313Z] DRIVER_CTRL: getDriverDashboard - User: 6993463109a83283ae7365ae, Comp: 698ac8b01587e01651a49443, Found: 12 vehicles
+[2026-08-08T20:27:23.511Z] DRIVER_CTRL: getDriverDashboard - Final Status: approved, Current Car: RJ-27-TA-9821
+[2026-08-08T20:30:19.169Z] Login attempt started
+[2026-08-08T20:30:19.171Z] Login request for: Gopal123
+[2026-08-08T20:30:19.872Z] User found: Gopal Audichiy (Role: Driver)
+[2026-08-08T20:30:19.987Z] Match debug: receivedPwdLen=10, dbHashStart=$2a$10$M5k, isMatch=true
+[2026-08-08T20:30:19.988Z] Password matched
+[2026-08-08T20:30:19.990Z] DEBUG: Company status in DB is: "active" (Normalized: "active")
+[2026-08-08T20:30:24.241Z] DRIVER_CTRL: getDriverDashboard - User: 6993463109a83283ae7365ae, Company: 698ac8b01587e01651a49443
+[2026-08-08T20:30:25.157Z] DRIVER_CTRL: getDriverDashboard - User: 6993463109a83283ae7365ae, Comp: 698ac8b01587e01651a49443, Found: 12 vehicles
+[2026-08-08T20:30:25.342Z] DRIVER_CTRL: getDriverDashboard - Final Status: approved, Current Car: RJ-27-TA-9821
+[2026-08-08T20:30:54.557Z] DRIVER_CTRL: PunchIn - Start - KM: 123456, Vehicle: 6982efaa508a22188c618879
+[2026-08-08T20:30:58.574Z] DRIVER_CTRL: getDriverDashboard - User: 6993463109a83283ae7365ae, Company: 698ac8b01587e01651a49443
+[2026-08-08T20:30:58.985Z] DRIVER_CTRL: getDriverDashboard - User: 6993463109a83283ae7365ae, Comp: 698ac8b01587e01651a49443, Found: 12 vehicles
+[2026-08-08T20:30:59.497Z] DRIVER_CTRL: getDriverDashboard - Final Status: active, Current Car: RJ-27-TA-9821
+[2026-08-08T20:39:38.811Z] CRON: Cron Jobs Initialized
+[2026-08-08T20:40:11.687Z] CRON: Cron Jobs Initialized
+[2026-08-08T20:40:25.820Z] CRON: Cron Jobs Initialized
+[2026-08-08T20:40:43.063Z] CRON: Cron Jobs Initialized
+[2026-08-08T20:41:10.390Z] CRON: Cron Jobs Initialized
+[2026-08-08T21:20:40.142Z] Login attempt started
+[2026-08-08T21:20:40.145Z] Login request for: Gopal123
+[2026-08-08T21:20:46.072Z] User found: Gopal Audichiy (Role: Driver)
+[2026-08-08T21:20:46.302Z] Match debug: receivedPwdLen=10, dbHashStart=$2a$10$M5k, isMatch=true
+[2026-08-08T21:20:46.304Z] Password matched
+[2026-08-08T21:20:46.305Z] DEBUG: Company status in DB is: "active" (Normalized: "active")
+[2026-08-08T21:20:47.436Z] DRIVER_CTRL: getDriverDashboard - User: 6993463109a83283ae7365ae, Company: 698ac8b01587e01651a49443
+[2026-08-08T21:20:47.662Z] DRIVER_CTRL: getDriverDashboard - User: 6993463109a83283ae7365ae, Comp: 698ac8b01587e01651a49443, Found: 12 vehicles
+[2026-08-08T21:20:48.018Z] DRIVER_CTRL: getDriverDashboard - Final Status: active, Current Car: RJ-27-TA-9821
+[2026-08-08T21:21:30.459Z] DRIVER_CTRL: getDriverDashboard - User: 6993463109a83283ae7365ae, Company: 698ac8b01587e01651a49443
+[2026-08-08T21:21:30.718Z] DRIVER_CTRL: getDriverDashboard - User: 6993463109a83283ae7365ae, Comp: 698ac8b01587e01651a49443, Found: 12 vehicles
+[2026-08-08T21:21:31.086Z] DRIVER_CTRL: getDriverDashboard - Final Status: completed, Current Car: RJ-27-TA-9821
+[2026-08-08T21:21:40.898Z] Login attempt started
+[2026-08-08T21:21:40.900Z] Login request for: Kavishuser1
+[2026-08-08T21:21:41.038Z] User found: Yatree (Role: Admin)
+[2026-08-08T21:21:41.226Z] Match debug: receivedPwdLen=11, dbHashStart=$2a$10$SZI, isMatch=true
+[2026-08-08T21:21:41.227Z] Password matched
+[2026-08-08T21:21:41.229Z] DEBUG: Company status in DB is: "active" (Normalized: "active")
+[2026-08-08T21:43:58.265Z] CRON: Cron Jobs Initialized
