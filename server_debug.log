@@ -76,3 +76,87 @@
 [2026-08-08T21:21:41.227Z] Password matched
 [2026-08-08T21:21:41.229Z] DEBUG: Company status in DB is: "active" (Normalized: "active")
 [2026-08-08T21:43:58.265Z] CRON: Cron Jobs Initialized
+[2026-08-09T05:41:27.865Z] CRON: Cron Jobs Initialized
+[2026-08-09T05:47:42.089Z] Login attempt started
+[2026-08-09T05:47:42.090Z] Login request for: Kavishuser1
+[2026-08-09T05:47:42.333Z] User found: Yatree (Role: Admin)
+[2026-08-09T05:47:42.442Z] Match debug: receivedPwdLen=4, dbHashStart=$2a$10$SZI, isMatch=false
+[2026-08-09T05:47:42.443Z] Invalid credentials
+[2026-08-09T05:52:36.278Z] CRON: Cron Jobs Initialized
+[2026-08-09T06:15:29.952Z] CRON: Cron Jobs Initialized
+[2026-08-09T06:15:39.901Z] CRON: Cron Jobs Initialized
+[2026-08-09T06:42:01.567Z] Login attempt started
+[2026-08-09T06:42:01.570Z] Login request for: rahul123
+[2026-08-09T06:42:02.062Z] Login failed: User [rahul123] not found in standard lookup.
+[2026-08-09T06:42:08.866Z] Login attempt started
+[2026-08-09T06:42:08.868Z] Login request for: rahul123
+[2026-08-09T06:42:09.028Z] Login failed: User [rahul123] not found in standard lookup.
+[2026-08-09T06:42:19.964Z] Login attempt started
+[2026-08-09T06:42:19.966Z] Login request for: rahul123
+[2026-08-09T06:42:20.074Z] Login failed: User [rahul123] not found in standard lookup.
+[2026-08-09T06:42:31.594Z] Login attempt started
+[2026-08-09T06:42:31.597Z] Login request for: @abhinandan
+[2026-08-09T06:42:32.066Z] User found: System Admin (Role: SuperAdmin)
+[2026-08-09T06:42:32.223Z] Match debug: receivedPwdLen=9, dbHashStart=$2a$10$/3i, isMatch=true
+[2026-08-09T06:42:32.224Z] Password matched
+[2026-08-09T06:42:32.224Z] DEBUG: Company status in DB is: "active" (Normalized: "active")
+[2026-08-09T06:43:12.447Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"69fdbdb6dbc3334c91fb55eb"},{"company":"69fdbdb6dbc3334c91fb55eb"}],"isOutsideCar":{"$ne":true},"company":"69fdbdb6dbc3334c91fb55eb"}
+[2026-08-13T05:40:05.565Z] CRON: Cron Jobs Initialized
+[2026-08-13T05:41:11.122Z] CRON: Cron Jobs Initialized
+[2026-08-13T05:43:44.523Z] CRON: Cron Jobs Initialized
+[2026-08-13T05:44:10.924Z] Login attempt started
+[2026-08-13T05:44:10.926Z] Login request for: Kavishuser1
+[2026-08-13T05:44:11.137Z] User found: Yatree (Role: Admin)
+[2026-08-13T05:44:11.380Z] Match debug: receivedPwdLen=11, dbHashStart=$2a$10$SZI, isMatch=true
+[2026-08-13T05:44:11.383Z] Password matched
+[2026-08-13T05:44:11.384Z] DEBUG: Company status in DB is: "active" (Normalized: "active")
+[2026-08-13T05:44:31.389Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T05:44:31.661Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T05:46:32.347Z] CRON: Cron Jobs Initialized
+[2026-08-13T05:46:51.213Z] CRON: Cron Jobs Initialized
+[2026-08-13T05:47:17.818Z] CRON: Cron Jobs Initialized
+[2026-08-13T05:48:02.018Z] CRON: Cron Jobs Initialized
+[2026-08-13T05:48:58.990Z] CRON: Cron Jobs Initialized
+[2026-08-13T05:49:07.965Z] CRON: Cron Jobs Initialized
+[2026-08-13T05:50:17.679Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T05:50:17.986Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T05:51:06.772Z] CRON: Cron Jobs Initialized
+[2026-08-13T05:52:00.632Z] CRON: Cron Jobs Initialized
+[2026-08-13T05:52:52.165Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T05:55:31.259Z] CRON: Cron Jobs Initialized
+[2026-08-13T05:56:00.113Z] CRON: Cron Jobs Initialized
+[2026-08-13T06:02:55.280Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:03:09.511Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:03:23.542Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:03:40.847Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:03:57.130Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:04:13.181Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:04:26.725Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:04:40.344Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:06:16.606Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:08:07.304Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:08:28.105Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:10:01.071Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:10:57.648Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:11:13.159Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:11:55.851Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:12:01.087Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:12:03.325Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443"}
+[2026-08-13T06:15:00.699Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:15:44.718Z] CRON: Cron Jobs Initialized
+[2026-08-13T06:16:02.443Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443"}
+[2026-08-13T06:16:58.914Z] CRON: Cron Jobs Initialized
+[2026-08-13T06:18:27.472Z] CRON: Cron Jobs Initialized
+[2026-08-13T06:18:54.193Z] CRON: Cron Jobs Initialized
+[2026-08-13T06:20:14.059Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:21:03.465Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:22:12.895Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:22:13.172Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:22:20.188Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:22:20.361Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:22:22.595Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:22:25.565Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:22:31.875Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:22:31.882Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":true,"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:22:31.889Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":true,"createdAt":{"$gte":"2026-04-01T00:00:00.000Z","$lte":"2027-03-31T23:59:59.000Z"},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-08-13T06:22:32.528Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}

@@ -32,12 +32,12 @@ const seed = async () => {
             console.log('Master SuperAdmin user created and assigned to PrimaryFleet');
         } else {
             // Update existing user to ensure role and company are set correctly
-            adminUser.role = 'SuperAdmin';
-            if (targetCompany) {
-                adminUser.company = targetCompany._id;
-            }
-            await adminUser.save();
-            console.log('Master SuperAdmin user updated with correct role and company');
+            // adminUser.role = 'SuperAdmin';
+            // if (targetCompany) {
+            //     adminUser.company = targetCompany._id;
+            // }
+            // await adminUser.save();
+            console.log('Skipped updating existing admin to prevent overwriting their original company.');
         }
 
         console.log('Seed check completed');
