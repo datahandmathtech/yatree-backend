@@ -1,30 +1,27 @@
 const mongoose = require('mongoose');
 
-const itinerarySchema = new mongoose.Schema({
+const bookingItinerarySchema = new mongoose.Schema({
     dayNo: { type: Number, default: 1 },
     date: { type: Date, required: true },
     time: { type: String, default: '09:00 AM' },
     pickupPoint: { type: String, default: '' },
     duty: { type: String, default: '' },
-    description: { type: String, required: true }, // Keep description for backwards compatibility
+    description: { type: String, default: '' },
     vehicleType: { type: String, default: '' },
     vehicleCount: { type: Number, default: 1 },
     estimatedKm: { type: Number, default: 0 },
     estimatedHours: { type: Number, default: 0 },
-    amount: { type: Number, required: true, default: 0 },
+    amount: { type: Number, default: 0 },
     inclusions: { type: String, default: '' },
     exclusions: { type: String, default: '' },
     specialNotes: { type: String, default: '' }
 });
 
-const extraChargeSchema = new mongoose.Schema({
-    type: { type: String, required: true },
-    amount: { type: Number, required: true, default: 0 }
-});
-
-const leadSchema = new mongoose.Schema({
-    leadId: {
+const bookingSchema = new mongoose.Schema({
+    bookingId: {
         type: String,
+        required: true,
+        unique: true,
         index: true
     },
     company: {
@@ -32,14 +29,23 @@ const leadSchema = new mongoose.Schema({
         ref: 'Company',
         required: true
     },
+    lead: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Lead',
+        default: null
+    },
+    client: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Client',
+        default: null
+    },
     salesPerson: {
         type: String,
         default: ''
     },
-    salesUser: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        default: null
+    source: {
+        type: String,
+        default: 'Direct'
     },
     clientName: {
         type: String,
@@ -47,8 +53,7 @@ const leadSchema = new mongoose.Schema({
     },
     mobileNumber: {
         type: String,
-        required: true,
-        index: true
+        required: true
     },
     alternateMobile: {
         type: String,
@@ -62,15 +67,7 @@ const leadSchema = new mongoose.Schema({
         type: String,
         default: ''
     },
-    source: {
-        type: String,
-        default: 'Website'
-    },
-    reference: {
-        type: String,
-        default: ''
-    },
-    leadDate: {
+    bookingDate: {
         type: Date,
         default: Date.now
     },
@@ -82,23 +79,25 @@ const leadSchema = new mongoose.Schema({
         type: Date,
         required: true
     },
-    carType: {
+    vehicleType: {
         type: String,
         required: true
     },
     numberOfCars: {
         type: Number,
-        required: true,
         default: 1
     },
-    itinerary: [itinerarySchema],
-    extraCharges: [extraChargeSchema],
+    itinerary: [bookingItinerarySchema],
     totalAmount: {
         type: Number,
         required: true,
         default: 0
     },
-    advancePayment: {
+    advancePaid: {
+        type: Number,
+        default: 0
+    },
+    balanceDue: {
         type: Number,
         default: 0
     },
@@ -107,28 +106,44 @@ const leadSchema = new mongoose.Schema({
         enum: ['GST Extra', 'GST Inclusive', 'No GST', 'RCM'],
         default: 'GST Inclusive'
     },
-    status: {
+    gstRate: {
+        type: Number,
+        default: 5
+    },
+    taxableAmount: {
+        type: Number,
+        default: 0
+    },
+    gstAmount: {
+        type: Number,
+        default: 0
+    },
+    bookingStatus: {
         type: String,
-        enum: ['New', 'Follow-up', 'Quoted', 'Negotiation', 'Confirmed', 'Lost', 'Cancelled'],
-        default: 'New'
+        enum: ['Confirmed', 'Scheduled', 'Ongoing', 'Completed', 'Invoiced', 'Cancelled', 'Closed'],
+        default: 'Confirmed'
     },
-    bookingId: {
+    paymentStatus: {
         type: String,
-        default: null
+        enum: ['No Advance', 'Advance Received', 'Partial', 'Full Received', 'Refund Due', 'Settled'],
+        default: 'Advance Received'
     },
-    bookingRef: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Booking',
-        default: null
-    },
+    termsAndConditions: [{
+        type: String
+    }],
     notes: {
         type: String,
         default: ''
-    }
+    },
+    drsDuties: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'DRSDuty'
+    }]
 }, {
     timestamps: true
 });
 
-leadSchema.index({ company: 1, createdAt: -1 });
+bookingSchema.index({ company: 1, bookingDate: -1 });
+bookingSchema.index({ company: 1, bookingStatus: 1 });
 
-module.exports = mongoose.model('Lead', leadSchema);
+module.exports = mongoose.model('Booking', bookingSchema);

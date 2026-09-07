@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
     getLeads,
+    checkDuplicatePhone,
     getLeadById,
     createLead,
     updateLead,
@@ -14,6 +15,9 @@ router.use(protect);
 
 router.route('/')
     .post(adminOrExecutive, createLead);
+
+router.route('/check-phone/:companyId')
+    .get(adminOrExecutive, checkCompany, checkDuplicatePhone);
 
 router.route('/:companyId')
     .get(adminOrExecutive, checkCompany, getLeads);
