@@ -338,7 +338,14 @@ const convertToBooking = asyncHandler(async (req, res) => {
         drsDuties: drsEntries
     });
 
-    // 6. Update lead status and reference
+    // 6. Update lead status and reference, and link drsDuties with bookingRef
+    if (drsEntries.length > 0) {
+        await DRSDuty.updateMany(
+            { _id: { $in: drsEntries } },
+            { bookingRef: booking._id }
+        );
+    }
+
     lead.status = 'Confirmed';
     lead.advancePayment = advance;
     lead.bookingId = bookingId;
