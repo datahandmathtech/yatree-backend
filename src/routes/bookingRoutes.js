@@ -11,7 +11,7 @@ const { adminOrExecutive, checkCompany, protect } = require('../middleware/authM
 
 router.use(protect);
 
-router.route('/:companyId')
+router.route(['/:companyId', '/company/:companyId'])
     .get(adminOrExecutive, checkCompany, getBookings);
 
 router.route('/single/:id')

@@ -10,7 +10,7 @@ const { protect, adminOrExecutive, checkCompany } = require('../middleware/authM
 
 router.use(protect);
 
-router.route('/company/:companyId')
+router.route(['/company/:companyId', '/:companyId'])
     .get(adminOrExecutive, checkCompany, getClients);
 
 router.route('/:id/ledger')

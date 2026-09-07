@@ -402,3 +402,20 @@
 [2026-09-07T08:19:09.693Z] CRON: Cron Jobs Initialized
 [2026-09-07T08:25:32.374Z] CRON: Cron Jobs Initialized
 [2026-09-07T08:26:51.695Z] CRON: Cron Jobs Initialized
+[2026-09-07T08:29:50.845Z] CRON: Cron Jobs Initialized
+[2026-09-07T08:30:18.524Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-09-07T08:30:18.536Z] GLOBAL_ERROR: Not Found - /api/leads/company/698ac8b01587e01651a49443 - Stack: Error: Not Found - /api/leads/company/698ac8b01587e01651a49443
+    at notFound (E:\New folder\Master-Server\TEXI\yatree-backend\src\middleware\errorMiddleware.js:2:19)
+    at Layer.handle [as handle_request] (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\layer.js:95:5)
+    at trim_prefix (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:328:13)
+    at E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:286:9
+    at Function.process_params (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:346:12)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:280:10)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\route.js:141:14)
+    at E:\New folder\Master-Server\TEXI\yatree-backend\src\app.js:129:16
+    at Layer.handle [as handle_request] (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\layer.js:95:5)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\route.js:149:13)
+[2026-09-07T08:31:17.305Z] CRON: Cron Jobs Initialized
+[2026-09-07T08:31:23.253Z] CRON: Cron Jobs Initialized
+[2026-09-07T08:31:32.457Z] CRON: Cron Jobs Initialized
+[2026-09-07T08:31:40.266Z] CRON: Cron Jobs Initialized

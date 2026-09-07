@@ -14,7 +14,7 @@ router.use(protect);
 router.route('/')
     .post(adminOrExecutive, createInvoice);
 
-router.route('/:companyId')
+router.route(['/:companyId', '/company/:companyId'])
     .get(adminOrExecutive, checkCompany, getInvoices);
 
 router.route('/single/:id')

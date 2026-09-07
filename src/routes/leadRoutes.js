@@ -19,7 +19,7 @@ router.route('/')
 router.route('/check-phone/:companyId')
     .get(adminOrExecutive, checkCompany, checkDuplicatePhone);
 
-router.route('/:companyId')
+router.route(['/:companyId', '/company/:companyId'])
     .get(adminOrExecutive, checkCompany, getLeads);
 
 router.route('/single/:id')
