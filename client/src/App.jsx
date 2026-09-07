@@ -6,12 +6,15 @@ import { LanguageProvider } from './context/LanguageContext';
 // Last Updated: 2026-04-25 12:39 PM - Frontend Sync
 import { ThemeProvider } from './context/ThemeContext';
 import Sidebar from './components/Sidebar';
-
 import ThemeSwitcher from './components/common/ThemeSwitcher';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
-// Lazy load pages
+// Lazy load pages for better performance
 const Login = lazy(() => import('./pages/Login'));
 const Bridge = lazy(() => import('./pages/Bridge'));
+const Leads = lazy(() => import('./pages/Leads'));
+const Bookings = lazy(() => import('./pages/Bookings'));
+const DRS = lazy(() => import('./pages/DRS'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const DriverPortal = lazy(() => import('./pages/DriverPortal'));
 const Drivers = lazy(() => import('./pages/Drivers'));
@@ -34,10 +37,27 @@ const DriverSalaries = lazy(() => import('./pages/DriverSalaries'));
 const VehicleMonthlyDetails = lazy(() => import('./pages/VehicleMonthlyDetails'));
 const LiveFeed = lazy(() => import('./pages/LiveFeed'));
 const EventManagement = lazy(() => import('./pages/EventManagement'));
+const GPSMap = lazy(() => import('./pages/GPSMap'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Profile = lazy(() => import('./pages/Profile'));
 const DriverServices = lazy(() => import('./pages/DriverServices'));
 const DriversPanel = lazy(() => import('./pages/DriversPanel'));
+const ClientLedgers = lazy(() => import('./pages/ClientLedgers'));
+const Invoices = lazy(() => import('./pages/Invoices'));
+
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+
+  React.useEffect(() => {
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: 'smooth'
+    });
+  }, [pathname]);
+
+  return null;
+};
 
 const LoadingFallback = () => (
   <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: 'radial-gradient(circle at top right, #1e293b, #0f172a)', color: 'white' }}>
@@ -87,7 +107,7 @@ const AdminLayout = ({ children }) => {
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
       {isSidebarOpen && (
-        <div onClick={() => setIsSidebarOpen(false)} className="show-mobile" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 99999 }} />
+        <div onClick={() => setIsSidebarOpen(false)} className="show-tablet" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 99999 }} />
       )}
 
       <main className="main-content" style={{ flex: '1', width: '100%', maxWidth: '100vw', overflowX: 'hidden', transition: 'padding 0.3s ease', padding: '0' }}>
@@ -129,7 +149,13 @@ const AdminRoutes = () => {
   return (
     <Routes>
       <Route index element={canAccess('dashboard') ? <AdminDashboard /> : <Navigate to="/login" />} />
+      <Route path="leads" element={canAccess('leads') ? <Leads /> : <Navigate to="/admin" />} />
+      <Route path="bookings" element={canAccess('leads') ? <Bookings /> : <Navigate to="/admin" />} />
+      <Route path="client-ledgers" element={canAccess('leads') ? <ClientLedgers /> : <Navigate to="/admin" />} />
+      <Route path="drs" element={canAccess('drs') ? <DRS /> : <Navigate to="/admin" />} />
+      <Route path="invoices" element={canAccess('leads') ? <Invoices /> : <Navigate to="/admin" />} />
       <Route path="live-feed" element={canAccess('liveFeed') || canAccess('vehiclesManagement') ? <LiveFeed /> : <Navigate to="/admin" />} />
+      <Route path="live-map" element={canAccess('liveFeed') || canAccess('vehiclesManagement') ? <GPSMap /> : <Navigate to="/admin" />} />
       <Route path="log-book" element={canAccess('logBook') || canAccess('vehiclesManagement') ? <Reports /> : <Navigate to="/admin" />} />
       {canAccess('driversService') && (
         <>
@@ -177,21 +203,131 @@ const AdminRoutes = () => {
 };
 
 function App() {
+  React.useEffect(() => {
+    // Intercept React programmatic value changes
+    const originalValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+    
+    Object.defineProperty(window.HTMLInputElement.prototype, 'value', {
+        set: function(val) {
+            originalValueSetter.call(this, val);
+            if (this.type === 'date') {
+                if (val) {
+                    const parts = val.split('-');
+                    if (parts.length === 3) {
+                        this.setAttribute('data-date', `${parts[2]}/${parts[1]}/${parts[0].slice(-2)}`);
+                    }
+                } else {
+                    this.setAttribute('data-date', 'DD/MM/YY');
+                }
+            } else if (this.type === 'datetime-local') {
+                if (val) {
+                    const [datePart, timePart] = val.split('T');
+                    if (datePart && timePart) {
+                        const parts = datePart.split('-');
+                        this.setAttribute('data-date', `${parts[2]}/${parts[1]}/${parts[0].slice(-2)} ${timePart}`);
+                    }
+                } else {
+                    this.setAttribute('data-date', 'DD/MM/YY --:--');
+                }
+            }
+        },
+        get: Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').get
+    });
+
+    const updateDateDisplay = (e) => {
+        const target = e.target;
+        if (target && target.type === 'date') {
+            if (target.value) {
+                const parts = target.value.split('-');
+                if(parts.length === 3) {
+                     target.setAttribute('data-date', `${parts[2]}/${parts[1]}/${parts[0].slice(-2)}`);
+                }
+            } else {
+                target.setAttribute('data-date', 'DD/MM/YY');
+            }
+        } else if (target && target.type === 'datetime-local') {
+            if (target.value) {
+                const [datePart, timePart] = target.value.split('T');
+                if (datePart && timePart) {
+                    const parts = datePart.split('-');
+                    target.setAttribute('data-date', `${parts[2]}/${parts[1]}/${parts[0].slice(-2)} ${timePart}`);
+                }
+            } else {
+                target.setAttribute('data-date', 'DD/MM/YY --:--');
+            }
+        }
+    };
+
+    const initInputs = () => {
+        document.querySelectorAll('input[type="date"], input[type="datetime-local"]').forEach(input => {
+            if (input.type === 'date') {
+                if (input.value) {
+                    const parts = input.value.split('-');
+                    if(parts.length === 3) {
+                         input.setAttribute('data-date', `${parts[2]}/${parts[1]}/${parts[0].slice(-2)}`);
+                    }
+                } else {
+                    input.setAttribute('data-date', 'DD/MM/YY');
+                }
+            } else if (input.type === 'datetime-local') {
+                if (input.value) {
+                    const [datePart, timePart] = input.value.split('T');
+                    if (datePart && timePart) {
+                        const parts = datePart.split('-');
+                        input.setAttribute('data-date', `${parts[2]}/${parts[1]}/${parts[0].slice(-2)} ${timePart}`);
+                    }
+                } else {
+                    input.setAttribute('data-date', 'DD/MM/YY --:--');
+                }
+            }
+        });
+    };
+
+    let mutationTimeout;
+    const observer = new MutationObserver(() => {
+        if (mutationTimeout) clearTimeout(mutationTimeout);
+        mutationTimeout = setTimeout(() => {
+            initInputs();
+        }, 100);
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    
+    initInputs();
+
+    document.addEventListener('change', updateDateDisplay, true);
+    document.addEventListener('input', updateDateDisplay, true);
+
+    return () => {
+        if (mutationTimeout) clearTimeout(mutationTimeout);
+        observer.disconnect();
+        document.removeEventListener('change', updateDateDisplay, true);
+        document.removeEventListener('input', updateDateDisplay, true);
+        // Restore original setter (optional but good practice, though this is global)
+        Object.defineProperty(window.HTMLInputElement.prototype, 'value', {
+            set: originalValueSetter,
+            get: Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').get
+        });
+    };
+  }, []);
+
   return (
     <Router>
+      <ScrollToTop />
       <LanguageProvider>
         <AuthProvider>
           <ThemeSwitcher />
-          <Suspense fallback={<LoadingFallback />}>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/bridge" element={<Bridge />} />
-              <Route path="/admin/*" element={<ProtectedRoute role="Admin"><CompanyProvider><AdminLayout><AdminRoutes /></AdminLayout></CompanyProvider></ProtectedRoute>} />
-              <Route path="/driver/*" element={<ProtectedRoute role="Driver"><DriverPortal /></ProtectedRoute>} />
-              <Route path="/staff/*" element={<ProtectedRoute role="Staff"><StaffPortal /></ProtectedRoute>} />
-              <Route path="/" element={<Navigate to="/login" />} />
-            </Routes>
-          </Suspense>
+          <ErrorBoundary>
+            <Suspense fallback={<LoadingFallback />}>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/bridge" element={<Bridge />} />
+                <Route path="/admin/*" element={<ProtectedRoute role="Admin"><CompanyProvider><AdminLayout><AdminRoutes /></AdminLayout></CompanyProvider></ProtectedRoute>} />
+                <Route path="/driver/*" element={<ProtectedRoute role="Driver"><DriverPortal /></ProtectedRoute>} />
+                <Route path="/staff/*" element={<ProtectedRoute role="Staff"><StaffPortal /></ProtectedRoute>} />
+                <Route path="/" element={<Navigate to="/login" />} />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
         </AuthProvider>
       </LanguageProvider>
     </Router>

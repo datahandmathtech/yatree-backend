@@ -21,6 +21,7 @@ const PremiumDateInput = ({ value, onChange, label, required = false, placeholde
             const [y, m, d] = value.split('-');
             if (y && m && d) {
                 setInputValue(`${d}-${m}-${y}`);
+                setViewDate(new Date(parseInt(y), parseInt(m) - 1, parseInt(d)));
             }
         } else {
             setInputValue('');

@@ -172,8 +172,12 @@ input[type="datetime-local"].input-field {
 
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-  filter: invert(1);
-  opacity: 0.5;
+  display: none;
+  -webkit-appearance: none;
+}
+
+input[type="date"] {
+  position: relative;
   cursor: pointer;
 }
 
@@ -189,17 +193,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-text {
   padding: 0 4px;
 }
 
-input[type="date"]::-webkit-datetime-edit-month-field,
-input[type="date"]::-webkit-datetime-edit-day-field,
-input[type="date"]::-webkit-datetime-edit-year-field,
-input[type="datetime-local"]::-webkit-datetime-edit-month-field,
-input[type="datetime-local"]::-webkit-datetime-edit-day-field,
-input[type="datetime-local"]::-webkit-datetime-edit-year-field,
-input[type="datetime-local"]::-webkit-datetime-edit-hour-field,
-input[type="datetime-local"]::-webkit-datetime-edit-minute-field,
-input[type="datetime-local"]::-webkit-datetime-edit-ampm-field {
-  color: white;
-}
+
 
 /* Animations */
 @keyframes fadeIn {
@@ -374,7 +368,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-ampm-field {
   max-width: 100%;
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 1025px) {
   .with-sidebar .main-content {
     margin-left: 280px;
     width: calc(100% - 280px);
@@ -1590,7 +1584,7 @@ header.dashboard-header {
    RESPONSIVE BREAKPOINTS
    ============================================ */
 
-@media (min-width: 1024px) {
+@media (min-width: 1025px) {
   .with-sidebar .main-content {
     margin-left: 280px;
     width: calc(100% - 280px);
@@ -1598,7 +1592,7 @@ header.dashboard-header {
   }
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 1024px) {
   .container-fluid {
     padding: 0 12px !important;
   }
@@ -1903,6 +1897,15 @@ header.dashboard-header {
   .show-mobile-flex {
     display: flex !important;
   }
+  .show-tablet {
+    display: block !important;
+  }
+  .hide-tablet {
+    display: none !important;
+  }
+}
+.show-tablet {
+  display: none !important;
 }
 
 .table-responsive {
@@ -2317,4 +2320,84 @@ header.dashboard-header {
 .sub-component {
   width: 100%;
   padding: 0;
+}
+
+
+/* =========================================
+   TABLET RESPONSIVENESS ENHANCEMENTS
+   ========================================= */
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  /* 1. Sidebar & Layout */
+  .with-sidebar .main-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+    padding-top: 65px !important; 
+    overflow: visible !important;
+  }
+  .show-mobile-flex {
+    display: flex !important;
+  }
+  .hide-mobile {
+    display: none !important; /* Hide elements meant for large desktop only */
+  }
+
+  /* 2. Grid & Card Layouts */
+  .stats-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+  .grid-1-2-3-4 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .grid-1-2-2-3 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .grid-1-2-2-4 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .grid-1-1-2-3 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* 3. Forms & Modals */
+  .form-grid-2 {
+    grid-template-columns: 1fr 1fr !important; /* Keep 2 columns on tablet landscape/portrait */
+  }
+  .modal-content-wrapper {
+    width: 90% !important;
+    max-width: 800px !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+  }
+  .doc-upload-grid {
+    grid-template-columns: 1fr !important; /* Stack document uploads */
+  }
+
+  /* 4. Tables */
+  .table-responsive-wrapper,
+  .activity-table-wrapper,
+  .freelancer-table-wrapper,
+  .staff-attendance-table-wrapper {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    width: 100% !important;
+    display: block !important;
+  }
+  table {
+    min-width: 800px !important;
+  }
+}
+
+/* Landscape Tablet Adjustments */
+@media (min-width: 900px) and (max-width: 1024px) {
+  .stats-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+  .grid-1-2-3-4 {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+  /* 5. Expiry Alerts */
+  .expiry-alerts-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
 }

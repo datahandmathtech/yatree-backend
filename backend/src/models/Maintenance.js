@@ -44,6 +44,11 @@ const maintenanceSchema = new mongoose.Schema({
         enum: ['Paid', 'Due'],
         default: 'Paid'
     },
+    paymentSource: {
+        type: String,
+        enum: ['Office', 'Guest', 'Main Office', 'Paid'],
+        default: 'Office'
+    },
     currentKm: Number,
     nextServiceKm: Number,
     nextServiceDate: Date,

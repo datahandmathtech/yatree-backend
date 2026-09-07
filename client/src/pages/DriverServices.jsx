@@ -261,7 +261,7 @@ const DriverServices = () => {
     const fetchDrivers = async () => {
         if (!selectedCompany?._id) return;
         try {
-            const { data } = await axios.get(`/api/admin/drivers/${selectedCompany._id}?usePagination=false`);
+            const { data } = await axios.get(`/api/admin/drivers/${selectedCompany._id}?usePagination=false&driverType=All`);
             setDrivers(data.drivers || []);
         } catch (err) { console.error(err); }
     };
@@ -787,7 +787,7 @@ const DriverServices = () => {
                                 <div className="form-grid-2">
                                     <div>
                                         <label style={{ display: 'block', color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: '800', marginBottom: '6px' }}>SELECT VEHICLE</label>
-                                        <select value={formData.vehicleId} onChange={e => setFormData({...formData, vehicleId: e.target.value})} className="input-field" required>
+                                        <select value={formData.vehicleId} onChange={e => { const vid = e.target.value; const sv = vehicles.find(v => v._id === vid); setFormData({...formData, vehicleId: vid, driverId: sv?.currentDriver?._id || ''}); }} className="input-field" required>
                                             <option value="">Choose Car</option>
                                             {vehicles.map(v => <option key={v._id} value={v._id}>{v.carNumber}</option>)}
                                         </select>

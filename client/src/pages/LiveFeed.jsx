@@ -348,7 +348,36 @@ const LiveFeed = () => {
                         </h1>
                     </div>
 
-                    <div className="date-controls" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <div className="date-controls" style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                        {/* Search Bar (Moved to Top Left of Calendar) */}
+                        <div style={{ position: 'relative', width: 'clamp(200px, 30vw, 350px)' }}>
+                            <div style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: theme.primary }}>
+                                <Search size={18} strokeWidth={3} />
+                            </div>
+                            <input
+                                type="text"
+                                placeholder={`Locate ${activeTab}...`}
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '12px 20px 12px 48px',
+                                    background: 'rgba(0,0,0,0.3)',
+                                    border: `1px solid ${theme.primary}40`,
+                                    borderRadius: '16px',
+                                    color: 'white',
+                                    fontSize: '14px',
+                                    fontWeight: '700',
+                                    outline: 'none',
+                                    transition: 'all 0.3s ease',
+                                    backdropFilter: 'blur(10px)',
+                                    letterSpacing: '0.5px'
+                                }}
+                                className="search-input-focus"
+                            />
+                        </div>
+
+                        {/* Calendar Controls */}
                         <div style={{ background: 'rgba(0,0,0,0.3)', padding: '4px', borderRadius: '18px', display: 'flex', gap: '4px', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(10px)' }}>
                             <button
                                 onClick={() => {
@@ -554,39 +583,12 @@ const LiveFeed = () => {
                     justifyContent: 'space-between',
                     gap: '20px'
                 }}>
-                    <div className="livefeed-tabs premium-scroll" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.2)', padding: '5px', borderRadius: '18px', border: '1px solid rgba(255,255,255,0.03)', overflowX: 'auto' }}>
+                    <div className="livefeed-tabs premium-scroll" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.2)', padding: '5px', borderRadius: '18px', border: '1px solid rgba(255,255,255,0.03)', overflowX: 'auto', width: '100%' }}>
                         <TabButton id="drivers" label="Drivers" icon={Users} count={stats?.liveDriversFeed?.length || 0} />
                         <TabButton id="vehicles" label="Fleet" icon={Car} count={stats?.totalUsedVehiclesCount || 0} />
                         <TabButton id="fuel" label="Fuel" icon={Fuel} count={stats?.dailyFuelEntries?.length || 0} />
                         <TabButton id="absent" label="Absent" icon={Users} count={stats?.absentDriversCount || 0} />
                         <TabButton id="unused" label="IDLE" icon={Car} count={stats?.unusedVehiclesCount || 0} />
-                    </div>
-
-                    <div style={{ position: 'relative', flex: 1, minWidth: 'clamp(200px, 100%, 450px)' }}>
-                        <div style={{ position: 'absolute', left: '22px', top: '50%', transform: 'translateY(-50%)', color: theme.primary, filter: `drop-shadow(0 0 8px ${theme.primary}40)` }}>
-                            <Search size={20} strokeWidth={3} />
-                        </div>
-                        <input
-                            type="text"
-                            placeholder={`Locate ${activeTab}...`}
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            style={{
-                                width: '100%',
-                                padding: '18px 24px 18px 64px',
-                                background: 'rgba(0,0,0,0.4)',
-                                border: `1px solid ${theme.primary}40`,
-                                borderRadius: '22px',
-                                color: 'white',
-                                fontSize: '15px',
-                                fontWeight: '700',
-                                outline: 'none',
-                                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                                boxShadow: 'inset 0 4px 12px rgba(0,0,0,0.2)',
-                                letterSpacing: '0.5px'
-                            }}
-                            className="search-input-focus"
-                        />
                     </div>
                 </div>
 

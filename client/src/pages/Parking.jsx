@@ -10,6 +10,7 @@ import { useCompany } from '../context/CompanyContext';
 import { useTheme } from '../context/ThemeContext';
 import SEO from '../components/SEO';
 import PremiumDateInput from '../components/common/PremiumDateInput';
+import SearchableSelect from '../components/common/SearchableSelect';
 import { todayIST, toISTDateString, firstDayOfMonthIST, formatDateIST, nowIST, formatDateTimeIST } from '../utils/istUtils';
 
 const CameraModal = ({ onCapture, onClose }) => {
@@ -260,28 +261,40 @@ const ParkingPage = () => {
         finally { setLoading(false); }
     };
 
-    const fetchDrivers = async () => {
+    const fetchDrivers = async (overrideDate = null, vehicleId = null) => {
         if (!selectedCompany?._id) return;
         try {
             const userInfoStr = localStorage.getItem('userInfo');
             const userInfo = userInfoStr ? JSON.parse(userInfoStr) : null;
             if (!userInfo?.token) return;
 
-            const { data } = await axios.get(`/api/admin/drivers/${selectedCompany._id}?usePagination=false`, {
+            const targetDate = overrideDate || toDate;
+            const isToday = targetDate === new Date().toLocaleDateString('en-CA');
+            const exactDateParam = !isToday ? '&exactDate=true' : '';
+            const vehicleParam = vehicleId ? `&exactVehicleId=${vehicleId}` : '';
+            const { data } = await axios.get(`/api/admin/drivers/${selectedCompany._id}?usePagination=false&driverType=All&toDate=${targetDate}${exactDateParam}${vehicleParam}`, {
                 headers: { Authorization: `Bearer ${userInfo.token}` }
             });
             setDrivers(data.drivers || []);
         } catch (err) { console.error(err); }
     };
 
-    const fetchVehicles = async () => {
+    useEffect(() => {
+        if (showModal && formData.date) {
+            fetchDrivers(formData.date, formData.vehicleId);
+            fetchVehicles(formData.date);
+        }
+    }, [formData.date, formData.vehicleId, showModal]);
+
+    const fetchVehicles = async (overrideDate = null) => {
         if (!selectedCompany?._id) return;
         try {
             const userInfoStr = localStorage.getItem('userInfo');
             const userInfo = userInfoStr ? JSON.parse(userInfoStr) : null;
             if (!userInfo?.token) return;
 
-            const { data } = await axios.get(`/api/admin/vehicles/${selectedCompany._id}`, {
+            const targetDate = overrideDate || toDate;
+            const { data } = await axios.get(`/api/admin/vehicles/${selectedCompany._id}?usePagination=false&type=fleet&toDate=${targetDate}`, {
                 headers: { Authorization: `Bearer ${userInfo.token}` }
             });
             setVehicles(data.vehicles || []);
@@ -796,7 +809,7 @@ const ParkingPage = () => {
                                         <div style={{ position: 'relative', flexShrink: 0 }}>
                                             <img
                                                 src={getImageUrl(entry.slipPhoto)}
-                                                onClick={() => { setSelectedImage(entry.slipPhoto); setShowImageModal(true); }}
+                                                onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); setSelectedImage(entry.slipPhoto); setShowImageModal(true); }}
                                                 style={{ width: '80px', height: '80px', borderRadius: '18px', objectFit: 'cover', cursor: 'pointer', border: '2px solid rgba(251, 191, 36, 0.3)', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}
                                             />
                                             <div style={{ position: 'absolute', top: '-6px', right: '-6px', background: 'var(--primary)', color: 'black', width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '950', border: '3px solid #1a2233' }}>
@@ -970,7 +983,7 @@ const ParkingPage = () => {
                                                         <div style={{ position: 'relative', flexShrink: 0 }}>
                                                             <img
                                                                 src={getImageUrl(entry.slipPhoto)}
-                                                                onClick={() => { setSelectedImage(entry.slipPhoto); setShowImageModal(true); }}
+                                                                onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); setSelectedImage(entry.slipPhoto); setShowImageModal(true); }}
                                                                 style={{ width: '64px', height: '64px', borderRadius: '14px', objectFit: 'cover', cursor: 'pointer', border: '2px solid rgba(244,63,94,0.25)', filter: 'grayscale(10%)' }}
                                                                 alt="slip"
                                                             />
@@ -1196,7 +1209,7 @@ const ParkingPage = () => {
                                                     <td style={{ padding: '15px 25px', textAlign: 'right', borderTopRightRadius: '12px', borderBottomRightRadius: '12px' }}>
                                                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                                                             <button
-                                                                onClick={() => { setSelectedImage(e.receiptPhoto || ''); setShowImageModal(true); }}
+                                                                onPointerDown={(ev) => { ev.stopPropagation(); ev.preventDefault(); setSelectedImage(e.receiptPhoto || ''); setShowImageModal(true); }}
                                                                 className="btn-glass"
                                                                 style={{ padding: '8px', borderRadius: '8px', background: e.receiptPhoto ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255,255,255,0.03)' }}
                                                             >
@@ -1314,7 +1327,7 @@ const ParkingPage = () => {
                                                 <div style={{ display: 'flex', gap: '8px' }}>
                                                     {e.receiptPhoto && (
                                                         <button
-                                                            onClick={() => { setSelectedImage(e.receiptPhoto); setShowImageModal(true); }}
+                                                            onPointerDown={(ev) => { ev.stopPropagation(); ev.preventDefault(); setSelectedImage(e.receiptPhoto); setShowImageModal(true); }}
                                                             style={{
                                                                 width: '32px',
                                                                 height: '32px',
@@ -1364,7 +1377,7 @@ const ParkingPage = () => {
                                     animate={{ y: 0, opacity: 1 }}
                                     exit={{ y: 50, opacity: 0 }}
                                     className="premium-glass"
-                                    style={{ width: '100%', maxWidth: '500px', padding: '0', border: '1px solid rgba(255,255,255,0.1)', background: '#0f172a', overflow: 'visible', margin: 'auto', borderRadius: '24px' }}
+                                    style={{ width: '100%', maxWidth: '800px', padding: '0', border: '1px solid rgba(255,255,255,0.1)', background: '#0f172a', overflow: 'visible', margin: 'auto', borderRadius: '24px' }}
                                 >
                                     <div style={{ padding: '24px 30px', background: 'linear-gradient(to right, #1e293b, #0f172a)', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10, borderTopLeftRadius: 'inherit', borderTopRightRadius: 'inherit' }}>
                                         <div>
@@ -1383,18 +1396,18 @@ const ParkingPage = () => {
                                                     <label style={{ fontSize: '11px', fontWeight: '800', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '1px' }}>Vehicle *</label>
                                                     <div style={{ position: 'relative' }}>
                                                         <Car size={18} style={{ position: 'absolute', left: '15px', top: '16px', color: 'var(--primary)' }} />
-                                                        <select
-                                                            className="input-field"
-                                                            style={{ height: '52px', borderRadius: '14px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', padding: '0 15px 0 45px', width: '100%', outline: 'none', cursor: 'pointer' }}
+                                                        <SearchableSelect
+                                                            options={vehicles.map(v => ({ value: v._id, label: `${v.carNumber}` }))}
                                                             value={formData.vehicleId || ''}
-                                                            onChange={(e) => setFormData({ ...formData, vehicleId: e.target.value })}
-                                                            required
-                                                        >
-                                                            <option value="" style={{ background: '#0f172a' }}>Select Vehicle</option>
-                                                            {vehicles.map(v => (
-                                                                <option key={v._id} value={v._id} style={{ background: '#0f172a' }}>{v.carNumber}</option>
-                                                            ))}
-                                                        </select>
+                                                            onChange={(vid) => {
+                                                                const selectedVehicle = vehicles.find(v => v._id === vid);
+                                                                const autoDriverId = selectedVehicle?.currentDriver?._id || '';
+                                                                const autoDriverName = selectedVehicle?.currentDriver?.name || '';
+                                                                setFormData({ ...formData, vehicleId: vid, driverId: autoDriverId, driver: autoDriverName });
+                                                            }}
+                                                            placeholder="Search Vehicle..."
+                                                            required={true}
+                                                        />
                                                     </div>
                                                 </div>
 

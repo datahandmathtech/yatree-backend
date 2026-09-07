@@ -12,6 +12,8 @@ import { useCompany } from '../context/CompanyContext';
 import { useTheme } from '../context/ThemeContext';
 import SEO from '../components/SEO';
 import { todayIST, formatDateIST, nowIST, toISTDateString } from '../utils/istUtils';
+import ImageUploader from '../components/common/ImageUploader';
+import SearchableSelect from '../components/common/SearchableSelect';
 
 const CarUtility = () => {
     const { theme } = useTheme();
@@ -53,7 +55,7 @@ const CarUtility = () => {
                 --glass-border: rgba(255, 255, 255, 0.05);
             }
             .premium-panel-utility {
-                background: linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.005) 100%);
+                background: rgba(15, 23, 42, 0.6);
                 backdrop-filter: blur(20px);
                 border: 1px solid var(--glass-border);
                 border-radius: 28px;
@@ -89,6 +91,63 @@ const CarUtility = () => {
             .utility-select-glow:focus {
                 border-color: var(--primary) !important;
                 box-shadow: 0 0 10px var(--primary-glow) !important;
+            }
+            .premium-input-container {
+                background: rgba(15, 23, 42, 0.4);
+                border: 1px solid rgba(255, 255, 255, 0.06);
+                border-radius: 16px;
+                padding: 10px 16px;
+                transition: all 0.3s ease;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+            .premium-input-container:focus-within {
+                border-color: var(--primary);
+                background: rgba(15, 23, 42, 0.6);
+                box-shadow: 0 0 0 3px var(--primary-glow);
+            }
+            .premium-input-container label {
+                color: rgba(255, 255, 255, 0.4);
+                font-size: 10px;
+                font-weight: 800;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            .premium-input-container input, .premium-input-container select, .premium-input-container textarea {
+                background: transparent;
+                border: none;
+                color: #fff;
+                font-size: 15px;
+                font-weight: 600;
+                outline: none;
+                width: 100%;
+                padding: 0;
+            }
+            .premium-input-container input::placeholder, .premium-input-container textarea::placeholder {
+                color: rgba(255, 255, 255, 0.2);
+            }
+            .premium-input-container input[type="date"]::-webkit-calendar-picker-indicator {
+                background: transparent;
+                bottom: 0;
+                color: transparent;
+                cursor: pointer;
+                height: auto;
+                left: 0;
+                position: absolute;
+                right: 0;
+                top: 0;
+                width: auto;
+                z-index: 10;
+                opacity: 0;
+            }
+            .premium-input-container input[type="number"]::-webkit-inner-spin-button, 
+            .premium-input-container input[type="number"]::-webkit-outer-spin-button { 
+                -webkit-appearance: none; 
+                margin: 0; 
+            }
+            .premium-input-container input[type="number"] {
+                -moz-appearance: textfield;
             }
         `;
         document.head.appendChild(style);
@@ -148,7 +207,7 @@ const CarUtility = () => {
                 axios.get(`/api/admin/vehicles/${selectedCompany._id}?usePagination=false&type=fleet`, { headers }),
                 axios.get(`/api/admin/border-tax/${selectedCompany._id}`, { headers }),
                 axios.get(`/api/admin/maintenance/${selectedCompany._id}?type=driver_services`, { headers }),
-                axios.get(`/api/admin/drivers/${selectedCompany._id}?usePagination=false`, { headers })
+                axios.get(`/api/admin/drivers/${selectedCompany._id}?usePagination=false&driverType=All`, { headers })
             ]);
 
             const targetCompanyId = String(selectedCompany._id);
@@ -363,10 +422,15 @@ const CarUtility = () => {
         return logs.sort((a, b) => new Date(b.date || b.billDate) - new Date(a.date || a.billDate));
     }, [vehicles, getVehicleActivity]);
 
-    // Period Totals
+    // Period Totals (respects Vehicle Filter)
     const globalStats = useMemo(() => {
         let f = 0, b = 0, s = 0;
-        vehicles.forEach(v => {
+        
+        const vehiclesToProcess = filterVehicle === 'All' 
+            ? vehicles 
+            : vehicles.filter(v => v._id === filterVehicle);
+
+        vehiclesToProcess.forEach(v => {
             const act = getVehicleActivity(v._id);
             f += act.fastag; b += act.border; s += act.service;
         });
@@ -375,7 +439,7 @@ const CarUtility = () => {
             t: f + b + s,
             lowBalanceCount: vehicles.filter(v => (v.fastagBalance || 0) < 500).length
         };
-    }, [vehicles, getVehicleActivity]);
+    }, [vehicles, getVehicleActivity, filterVehicle]);
 
     // Active Filters on the combined logs
     const filteredUnifiedLogs = useMemo(() => {
@@ -404,7 +468,7 @@ const CarUtility = () => {
     const detailVehicle = useMemo(() => vehicles.find(v => v._id === detailVehicleId), [vehicles, detailVehicleId]);
 
     return (
-        <div key={location.key} style={{ minHeight: '100vh', background: 'transparent', color: '#fff', padding: '30px' }}>
+        <div key={location.key} className="container-fluid" style={{ paddingBottom: '40px', color: '#fff' }}>
             <SEO title="Car Utility" description="Fleet Accounts Hub" />
 
             <div style={{ maxWidth: '1440px', margin: '0 auto' }}>
@@ -462,13 +526,13 @@ const CarUtility = () => {
                                 ))}
                             </select>
                             <div style={{ display: 'flex', alignItems: 'center', padding: '0 10px', gap: '6px' }}>
-                                <span style={{ fontSize: '9px', fontWeight: '900', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>FY</span>
+                                <span style={{ fontSize: '9px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase' }}>FY</span>
                                 <select
                                     value={selectedYear}
                                     onChange={(e) => setSelectedYear(Number(e.target.value))}
                                     style={{ background: 'transparent', border: 'none', color: theme.primary || '#fbbf24', fontWeight: '900', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
                                 >
-                                    {[2023, 2024, 2025, 2026, 2027].map(y => (
+                                    {Array.from({ length: new Date().getFullYear() - 2023 + 5 }, (_, i) => 2023 + i).map(y => (
                                         <option key={y} value={y} style={{ background: '#0f172a' }}>{y}-{String(y + 1).slice(-2)}</option>
                                     ))}
                                 </select>
@@ -517,7 +581,7 @@ const CarUtility = () => {
                             <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', gap: '15px', marginBottom: '25px', flexWrap: 'wrap' }}>
                                 {/* Search bar */}
                                 <div style={{ position: 'relative', width: '100%' }}>
-                                    <Search size={16} style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.3)' }} />
+                                    <Search size={16} style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                                     <input 
                                         type="text" 
                                         placeholder="Search remarks, borders, categories..." 
@@ -530,59 +594,65 @@ const CarUtility = () => {
                                 
                                 {/* Utility selector */}
                                 <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(15, 23, 42, 0.4)', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.06)', height: '48px', padding: '0 15px', gap: '10px' }}>
-                                    <Filter size={14} style={{ color: 'rgba(255,255,255,0.3)' }} />
+                                    <Filter size={14} style={{ color: '#94a3b8' }} />
                                     <select
                                         value={filterUtility}
                                         onChange={e => setFilterUtility(e.target.value)}
                                         style={{ width: '100%', background: 'transparent', border: 'none', color: 'white', fontWeight: '800', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
                                     >
                                         <option value="All" style={{ background: '#0f172a' }}>All Utility Types</option>
-                                        <option value="fastag" style={{ background: '#0f172a' }}>Fastag tolls</option>
-                                        <option value="border" style={{ background: '#0f172a' }}>Border tax permits</option>
-                                        <option value="services" style={{ background: '#0f172a' }}>Driver services</option>
+                                        <option value="fastag" style={{ background: '#0f172a' }}>Fastag tolls {filterVehicle !== 'All' ? `(${unifiedUtilityLogs.filter(l => l.type === 'fastag' && l.vehicleId === filterVehicle).length})` : ''}</option>
+                                        <option value="border" style={{ background: '#0f172a' }}>Border tax permits {filterVehicle !== 'All' ? `(${unifiedUtilityLogs.filter(l => l.type === 'border' && l.vehicleId === filterVehicle).length})` : ''}</option>
+                                        <option value="services" style={{ background: '#0f172a' }}>Driver services {filterVehicle !== 'All' ? `(${unifiedUtilityLogs.filter(l => l.type === 'services' && l.vehicleId === filterVehicle).length})` : ''}</option>
                                     </select>
                                 </div>
 
                                 {/* Vehicle Selector */}
                                 <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(15, 23, 42, 0.4)', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.06)', height: '48px', padding: '0 15px', gap: '10px' }}>
-                                    <Car size={14} style={{ color: 'rgba(255,255,255,0.3)' }} />
+                                    <Car size={14} style={{ color: '#94a3b8' }} />
                                     <select
                                         value={filterVehicle}
                                         onChange={e => setFilterVehicle(e.target.value)}
                                         style={{ width: '100%', background: 'transparent', border: 'none', color: 'white', fontWeight: '800', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
                                     >
                                         <option value="All" style={{ background: '#0f172a' }}>All Vehicles</option>
-                                        {vehicles.map(v => (
-                                            <option key={v._id} value={v._id} style={{ background: '#0f172a' }}>{v.carNumber}</option>
-                                        ))}
+                                        {vehicles.map(v => {
+                                            const count = unifiedUtilityLogs.filter(l => l.vehicleId === v._id).length;
+                                            return (
+                                                <option key={v._id} value={v._id} style={{ background: '#0f172a' }}>
+                                                    {v.carNumber} {count > 0 ? `(${count})` : ''}
+                                                </option>
+                                            );
+                                        })}
                                     </select>
                                 </div>
                             </div>
 
                             {/* Combined logs table */}
-                            <div className="premium-panel-utility" style={{ overflow: 'hidden', padding: '10px' }}>
+                            <div className="premium-panel-utility" style={{ overflow: 'hidden', padding: '10px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '28px' }}>
                                 <div style={{ overflowX: 'auto' }}>
                                     <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0' }}>
                                         <thead>
                                             <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
-                                                <th style={{ padding: '18px 25px', textAlign: 'left', fontSize: '11px', fontWeight: '900', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '1px' }}>Date</th>
-                                                <th style={{ padding: '18px 25px', textAlign: 'left', fontSize: '11px', fontWeight: '900', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '1px' }}>Vehicle</th>
-                                                <th style={{ padding: '18px 25px', textAlign: 'left', fontSize: '11px', fontWeight: '900', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '1px' }}>Utility Type</th>
-                                                <th style={{ padding: '18px 25px', textAlign: 'left', fontSize: '11px', fontWeight: '900', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '1px' }}>Details / Remarks</th>
-                                                <th style={{ padding: '18px 25px', textAlign: 'right', fontSize: '11px', fontWeight: '900', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '1px' }}>Amount</th>
-                                                <th style={{ padding: '18px 25px', textAlign: 'right', fontSize: '11px', fontWeight: '900', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '1px' }}>Actions</th>
+                                                <th style={{ padding: '18px 25px', textAlign: 'left', fontSize: '11px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Date</th>
+                                                <th style={{ padding: '18px 25px', textAlign: 'left', fontSize: '11px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Vehicle</th>
+                                                <th style={{ padding: '18px 25px', textAlign: 'left', fontSize: '11px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Utility Type</th>
+                                                <th style={{ padding: '18px 25px', textAlign: 'left', fontSize: '11px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Details / Remarks</th>
+                                                <th style={{ padding: '18px 25px', textAlign: 'left', fontSize: '11px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Payment Mode</th>
+                                                <th style={{ padding: '18px 25px', textAlign: 'right', fontSize: '11px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Amount</th>
+                                                <th style={{ padding: '18px 25px', textAlign: 'right', fontSize: '11px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {loading ? (
                                                 <tr>
-                                                    <td colSpan="6" style={{ padding: '100px', textAlign: 'center' }}>
+                                                    <td colSpan="7" style={{ padding: '100px', textAlign: 'center' }}>
                                                         <div className="spinner" style={{ margin: '0 auto' }}></div>
                                                     </td>
                                                 </tr>
                                             ) : filteredUnifiedLogs.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan="6" style={{ padding: '80px', textAlign: 'center' }}>
+                                                    <td colSpan="7" style={{ padding: '80px', textAlign: 'center' }}>
                                                         <div style={{ opacity: 0.2, marginBottom: '15px' }}><History size={36} style={{ margin: '0 auto' }} /></div>
                                                         <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', fontWeight: '700' }}>No utility logs recorded in this period matching filters.</span>
                                                     </td>
@@ -594,7 +664,7 @@ const CarUtility = () => {
                                                     </td>
                                                     <td style={{ padding: '18px 25px' }}>
                                                         <div style={{ fontWeight: '800', fontSize: '15px' }}>{log.car}</div>
-                                                        <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', fontWeight: '700' }}>{log.carModel || 'Standard'}</div>
+                                                        <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700' }}>{log.carModel || 'Standard'}</div>
                                                     </td>
                                                     <td style={{ padding: '18px 25px' }}>
                                                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '850', color: log.color, background: `${log.color}15`, padding: '4px 10px', borderRadius: '8px', textTransform: 'uppercase' }}>
@@ -602,7 +672,13 @@ const CarUtility = () => {
                                                         </span>
                                                     </td>
                                                     <td style={{ padding: '18px 25px', fontSize: '13px', color: 'rgba(255,255,255,0.6)', fontWeight: '600' }}>
-                                                        {log.remarks} {log.borderName ? `(${log.borderName})` : ''} {log.category ? `[${log.category}]` : ''}
+                                                        {log.remarks ? <div style={{ color: 'white', marginBottom: '3px' }}>{log.remarks}</div> : null}
+                                                        {log.borderName ? <div style={{ color: '#fbbf24', fontSize: '11px', fontWeight: '800' }}>{log.borderName}</div> : null}
+                                                        {log.category ? <div style={{ color: '#10b981', fontSize: '11px', fontWeight: '800' }}>{log.category}</div> : null}
+                                                        {(!log.remarks && !log.borderName && !log.category) ? '-' : ''}
+                                                    </td>
+                                                    <td style={{ padding: '18px 25px', fontSize: '13px', color: 'rgba(255,255,255,0.8)', fontWeight: '700' }}>
+                                                        {log.paymentMode || 'Cash'}
                                                     </td>
                                                     <td style={{ padding: '18px 25px', textAlign: 'right', fontSize: '15px', fontWeight: '900', color: '#10b981' }}>
                                                         ₹{Number(log.amount).toLocaleString()}
@@ -653,7 +729,7 @@ const CarUtility = () => {
                             {/* Search bar & balance filter */}
                             <div style={{ display: 'flex', gap: '15px', marginBottom: '25px', flexWrap: 'wrap', alignItems: 'center' }}>
                                 <div style={{ position: 'relative', flex: 1, minWidth: '300px' }}>
-                                    <Search size={16} style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.3)' }} />
+                                    <Search size={16} style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                                     <input 
                                         type="text" 
                                         placeholder="Search vehicle number..." 
@@ -679,18 +755,18 @@ const CarUtility = () => {
                             </div>
 
                             {/* Fleet Overview Grid */}
-                            <div className="premium-panel-utility" style={{ overflow: 'hidden', padding: '10px' }}>
+                            <div className="premium-panel-utility" style={{ overflow: 'hidden', padding: '10px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '28px' }}>
                                 <div style={{ overflowX: 'auto' }}>
                                     <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0' }}>
                                         <thead>
                                             <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
-                                                <th style={{ padding: '18px 25px', textAlign: 'left', fontSize: '11px', fontWeight: '900', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '1px' }}>Vehicle</th>
-                                                <th style={{ padding: '18px 25px', textAlign: 'right', fontSize: '11px', fontWeight: '900', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '1px' }}>Fastag Balance</th>
-                                                <th style={{ padding: '18px 25px', textAlign: 'right', fontSize: '11px', fontWeight: '900', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '1px' }}>Fastag (Month)</th>
-                                                <th style={{ padding: '18px 25px', textAlign: 'right', fontSize: '11px', fontWeight: '900', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '1px' }}>Border (Month)</th>
-                                                <th style={{ padding: '18px 25px', textAlign: 'right', fontSize: '11px', fontWeight: '900', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '1px' }}>Service (Month)</th>
-                                                <th style={{ padding: '18px 25px', textAlign: 'right', fontSize: '11px', fontWeight: '900', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '1px' }}>Total (Month)</th>
-                                                <th style={{ padding: '18px 25px', textAlign: 'right', fontSize: '11px', fontWeight: '900', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '1px' }}>Action</th>
+                                                <th style={{ padding: '18px 25px', textAlign: 'left', fontSize: '11px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Vehicle</th>
+                                                <th style={{ padding: '18px 25px', textAlign: 'right', fontSize: '11px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Fastag Balance</th>
+                                                <th style={{ padding: '18px 25px', textAlign: 'right', fontSize: '11px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Fastag (Month)</th>
+                                                <th style={{ padding: '18px 25px', textAlign: 'right', fontSize: '11px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Border (Month)</th>
+                                                <th style={{ padding: '18px 25px', textAlign: 'right', fontSize: '11px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Service (Month)</th>
+                                                <th style={{ padding: '18px 25px', textAlign: 'right', fontSize: '11px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Total (Month)</th>
+                                                <th style={{ padding: '18px 25px', textAlign: 'right', fontSize: '11px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Action</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -710,7 +786,7 @@ const CarUtility = () => {
                                                                 <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Car size={18} color="rgba(255,255,255,0.4)" /></div>
                                                                 <div>
                                                                     <div style={{ fontWeight: '800', fontSize: '16px' }}>{v.carNumber}</div>
-                                                                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontWeight: '700' }}>{v.model}</div>
+                                                                    <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>{v.model}</div>
                                                                 </div>
                                                             </div>
                                                         </td>
@@ -834,7 +910,7 @@ const CarUtility = () => {
                                     <ManagerHub
                                         key={activeUtility}
                                         type={activeUtility}
-                                        color={activeUtility === 'fastag' ? '#38bdf8' : activeUtility === 'border' ? '#fbbf24' : '#10b981'}
+                                        color="#fbbf24"
                                         act={getVehicleActivity(detailVehicleId)}
                                         drivers={drivers}
                                         getImageUrl={getImageUrl}
@@ -862,7 +938,7 @@ const CarUtility = () => {
                     <div className="modal-overlay">
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0, y: 15 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 15 }}
-                            className="modal-content-wrapper" style={{ maxWidth: '1000px', height: '90vh', padding: '0', background: '#020617', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '28px' }}
+                            className="modal-content-wrapper" style={{ width: '100%', maxWidth: '650px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', padding: '0', background: '#020617', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '28px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)', overflow: 'hidden' }}
                         >
                             <div style={{ padding: '30px 40px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.01)' }}>
                                 <h3 style={{ margin: 0, fontWeight: '950', fontSize: '22px', letterSpacing: '-0.5px' }}>
@@ -883,18 +959,18 @@ const CarUtility = () => {
                             </div>
                             <div style={{ flex: 1, padding: '40px', overflowY: 'auto' }}>
                                 {/* Tabbed Navigation */}
-                                <div style={{ display: 'flex', gap: '10px', padding: '8px', background: 'rgba(255,255,255,0.03)', borderRadius: '20px', marginBottom: '30px', border: '1px solid rgba(255,255,255,0.06)', width: 'fit-content' }}>
+                                <div style={{ display: 'flex', gap: '10px', padding: '8px', background: 'rgba(255,255,255,0.03)', borderRadius: '20px', marginBottom: '30px', border: '1px solid rgba(255,255,255,0.06)', width: 'fit-content', margin: '0 auto 30px auto' }}>
                                     {[
-                                        { id: 'fastag', label: 'Fastag', color: '#38bdf8', icon: CreditCard },
-                                        { id: 'border', label: 'Border Tax', color: '#fbbf24', icon: Shield },
-                                        { id: 'services', label: 'Other Service', color: '#10b981', icon: Wrench }
+                                        { id: 'fastag', label: 'Fastag', icon: CreditCard },
+                                        { id: 'border', label: 'Border Tax', icon: Shield },
+                                        { id: 'services', label: 'Other Service', icon: Wrench }
                                     ].map(tab => (
                                         <button
                                             key={tab.id}
                                             onClick={() => setActiveUtility(tab.id)}
                                             style={{
                                                 padding: '14px 25px', borderRadius: '14px', border: 'none', cursor: 'pointer',
-                                                background: (activeUtility || 'fastag') === tab.id ? tab.color : 'transparent',
+                                                background: (activeUtility || 'fastag') === tab.id ? '#fbbf24' : 'transparent',
                                                 color: (activeUtility || 'fastag') === tab.id ? '#000' : 'rgba(255,255,255,0.4)',
                                                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                                                 fontWeight: '1000', fontSize: '13px', transition: '0.3s cubic-bezier(0.4, 0, 0.2, 1)'
@@ -906,7 +982,7 @@ const CarUtility = () => {
                                 </div>
                                 <ManagerHub
                                     key={activeUtility || 'fastag'}
-                                    type={activeUtility || 'fastag'} color={(activeUtility || 'fastag') === 'fastag' ? '#38bdf8' : (activeUtility || 'fastag') === 'border' ? '#fbbf24' : '#10b981'}
+                                    type={activeUtility || 'fastag'} color="#fbbf24"
                                     act={selectedVehicleId === 'new' ? { items: { fastag: [], border: [], service: [] } } : getVehicleActivity(selectedVehicleId)}
                                     drivers={drivers} getImageUrl={getImageUrl}
                                     onAdd={(vId, data, file) => (activeUtility || 'fastag') === 'fastag' ? handleRecharge(vId, data, file) : (activeUtility || 'fastag') === 'border' ? handleAddTax(vId, data, file) : handleAddService(vId, data, file)}
@@ -931,7 +1007,7 @@ const DetailStat = ({ label, val, icon: Icon, col, isDark, desc }) => (
     <div className="glass-card" style={{ padding: '25px', background: isDark ? 'rgba(16, 185, 129, 0.05)' : 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '25px', display: 'flex', alignItems: 'center', gap: '20px' }}>
         <div style={{ width: '50px', height: '50px', borderRadius: '15px', background: `${col}15`, color: col, display: 'flex', justifyContent: 'center', alignItems: 'center' }}><Icon size={22} /></div>
         <div>
-            <div style={{ fontSize: '11px', fontWeight: '900', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>{label}</div>
+            <div style={{ fontSize: '11px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px' }}>{label}</div>
             <div style={{ fontSize: '22px', fontWeight: '1000', color: isDark ? col : '#fff' }}>₹{val.toLocaleString()}</div>
             {desc && <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.2)', fontWeight: '700', marginTop: '2px' }}>{desc}</div>}
         </div>
@@ -962,7 +1038,7 @@ const SummaryStat = ({ label, val, col, icon: Icon, isDark, desc }) => (
             boxShadow: `0 0 20px ${col}20`
         }}><Icon size={24} /></div>
         <div>
-            <div style={{ fontSize: '11px', fontWeight: '800', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '1px' }}>{label}</div>
+            <div style={{ fontSize: '11px', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>{label}</div>
             <div style={{ fontSize: '26px', fontWeight: '1000', color: isDark ? col : '#fff', letterSpacing: '-0.5px' }}>₹{val.toLocaleString()}</div>
             {desc && <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.2)', fontWeight: '700', marginTop: '2px' }}>{desc}</div>}
         </div>
@@ -970,7 +1046,7 @@ const SummaryStat = ({ label, val, col, icon: Icon, isDark, desc }) => (
 );
 
 const ManagerHub = ({ type, color, act, drivers, onAdd, onUpdate, onDelete, setViewingImage, submitting, vehicle, getImageUrl, companyId, selectedMonth, selectedYear, hideForm = false, allVehicles = [] }) => {
-    const [form, setForm] = useState({ amount: '', remarks: '', borderName: '', date: '', billDate: '', driverId: '', category: 'Car Wash', vehicleId: vehicle?._id || '', paymentSource: 'Office', paymentMode: 'UPI' });
+    const [form, setForm] = useState({ amount: '', remarks: '', borderName: '', date: '', billDate: '', validTill: '', driverId: '', category: 'Car Wash', vehicleId: vehicle?._id || '', paymentSource: 'Office', paymentMode: 'UPI' });
     const [file, setFile] = useState(null);
     const [editingItem, setEditingItem] = useState(null);
 
@@ -1000,6 +1076,7 @@ const ManagerHub = ({ type, color, act, drivers, onAdd, onUpdate, onDelete, setV
                 borderName: editingItem.borderName || '',
                 date: toISTDateString(editingItem.date || editingItem.billDate || ''),
                 billDate: toISTDateString(editingItem.billDate || editingItem.date || ''),
+                validTill: toISTDateString(editingItem.validTill || ''),
                 driverId: editingItem.driver?._id || editingItem.driver || '',
                 category: editingItem.category || 'Car Wash',
                 paymentMode: editingItem.method || editingItem.paymentMode || 'UPI',
@@ -1018,6 +1095,7 @@ const ManagerHub = ({ type, color, act, drivers, onAdd, onUpdate, onDelete, setV
                 borderName: '', 
                 date: defaultDate, 
                 billDate: defaultDate, 
+                validTill: '',
                 driverId: '', 
                 category: 'Car Wash', 
                 vehicleId: vehicle?._id || '', 
@@ -1078,7 +1156,7 @@ const ManagerHub = ({ type, color, act, drivers, onAdd, onUpdate, onDelete, setV
                 const isCurrentMonth = (istNow.getUTCMonth() + 1) === selectedMonth && istNow.getUTCFullYear() === selectedYear;
                 const defaultDate = isCurrentMonth ? todayIST() : `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
                 
-                setForm({ amount: '', remarks: '', borderName: '', date: defaultDate, billDate: defaultDate, driverId: '', category: 'Car Wash', vehicleId: vehicle?._id || '', paymentSource: 'Office', paymentMode: 'UPI' });
+                setForm({ amount: '', remarks: '', borderName: '', date: defaultDate, billDate: defaultDate, validTill: '', driverId: '', category: 'Car Wash', vehicleId: vehicle?._id || '', paymentSource: 'Office', paymentMode: 'UPI' });
                 setFile(null);
                 if (editingItem) setEditingItem(null);
             }
@@ -1088,202 +1166,138 @@ const ManagerHub = ({ type, color, act, drivers, onAdd, onUpdate, onDelete, setV
     };
 
     return (
-        <div className="manager-hub-container" style={{ color: '#fff' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '30px' }}>
-                <div className="entry-card premium-card" style={{ padding: '32px', borderRadius: '28px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <h3 style={{ margin: '0 0 25px 0', fontSize: '20px', fontWeight: '950', color, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <Plus size={22} /> {editingItem ? 'Edit' : 'New'} {type === 'fastag' ? 'Recharge' : type === 'border' ? 'Border Permit' : 'Other Service'}
-                    </h3>
+        <div className="manager-hub-container" style={{ color: '#fff', height: '100%', display: 'flex', justifyContent: 'center' }}>
+            <div style={{ width: '100%', maxWidth: '600px' }}>
+                {/* Form Side */}
+                <div style={{ padding: '20px 0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '30px' }}>
+                        <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: `${color}15`, color: color, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                            <Plus size={24} />
+                        </div>
+                        <div>
+                            <h3 style={{ margin: '0 0 4px 0', fontSize: '24px', fontWeight: '950', letterSpacing: '-0.5px' }}>
+                                {editingItem ? 'Edit' : 'New'} {type === 'fastag' ? 'Recharge' : type === 'border' ? 'Border Permit' : 'Service Record'}
+                            </h3>
+                            <p style={{ margin: 0, fontSize: '13px', color: 'rgba(255,255,255,0.4)', fontWeight: '600' }}>
+                                Fill out the details below to log the utility entry.
+                            </p>
+                        </div>
+                    </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                         {!vehicle && (
-                            <div>
-                                <label className="premium-label" style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '900', marginBottom: '8px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Select Vehicle</label>
-                                <select
+                            <div className="premium-input-container">
+                                <label>Select Vehicle</label>
+                                <SearchableSelect 
+                                    options={allVehicles.map(v => ({ value: v._id, label: `${v.carNumber} (${v.model})` }))}
                                     value={form.vehicleId}
-                                    onChange={e => setForm({ ...form, vehicleId: e.target.value })}
-                                    className="premium-compact-input"
-                                    style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '12px', color: '#fff' }}
-                                >
-                                    <option value="" style={{ background: '#1a1a1a' }}>Choose a car...</option>
-                                    {allVehicles.map(v => (
-                                        <option key={v._id} value={v._id} style={{ background: '#1a1a1a' }}>{v.carNumber} ({v.model})</option>
-                                    ))}
-                                </select>
+                                    onChange={(val) => setForm({ ...form, vehicleId: val })}
+                                    placeholder="Search Vehicle..."
+                                />
                             </div>
                         )}
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-                            <div>
-                                <label className="premium-label" style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '900', marginBottom: '8px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Amount (₹)</label>
-                                <input
-                                    type="number"
-                                    value={form.amount}
-                                    onChange={e => setForm({ ...form, amount: e.target.value })}
-                                    className="premium-compact-input"
-                                    placeholder="0"
-                                    style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '12px', color: '#fff', fontSize: '18px', fontWeight: '900' }}
-                                />
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                            <div className="premium-input-container">
+                                <label>Amount (₹)</label>
+                                <input type="number" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} placeholder="0.00" style={{ fontSize: '20px', fontWeight: '800', color }} />
                             </div>
-                            <div>
-                                <label className="premium-label" style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '900', marginBottom: '8px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Payment Mode</label>
-                                <select 
-                                    value={form.paymentMode} 
-                                    onChange={e => setForm({ ...form, paymentMode: e.target.value })} 
-                                    className="premium-compact-input"
-                                    style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '12px', color: '#fff' }}
-                                >
-                                    <option value="UPI">UPI</option>
-                                    <option value="Cash">Cash</option>
-                                    <option value="Bank Transfer">Bank Transfer</option>
+                            <div className="premium-input-container">
+                                <label>Payment Mode</label>
+                                <select value={form.paymentMode} onChange={e => setForm({ ...form, paymentMode: e.target.value })}>
+                                    <option value="UPI" style={{ background: '#0f172a' }}>UPI</option>
+                                    <option value="Cash" style={{ background: '#0f172a' }}>Cash</option>
+                                    <option value="Bank Transfer" style={{ background: '#0f172a' }}>Bank Transfer</option>
                                 </select>
                             </div>
                         </div>
 
-                        <div>
-                            <label className="premium-label" style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '900', marginBottom: '8px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Date</label>
-                            <div className="dual-date-input-container" style={{ position: 'relative' }}>
-                                <input
-                                    id="utility-date-picker"
-                                    type="date"
-                                    value={form.date || form.billDate}
-                                    onChange={e => setForm({ ...form, date: e.target.value, billDate: e.target.value })}
-                                    onClick={(e) => e.target.showPicker()}
-                                    className="premium-compact-input"
-                                    style={{ colorScheme: 'dark', width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '12px', color: '#fff', cursor: 'pointer' }}
-                                />
-                                <Calendar size={18} style={{ position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5, pointerEvents: 'none' }} />
+                        <div style={type === 'border' ? { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' } : {}}>
+                            <div className="premium-input-container">
+                                <label>{type === 'border' ? 'From Date' : 'Date'}</label>
+                                <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center' }}>
+                                    <div style={{ fontSize: '15px', fontWeight: '600', color: (form.date || form.billDate) ? '#fff' : 'rgba(255,255,255,0.2)' }}>
+                                        {(() => {
+                                            const dStr = form.date || form.billDate;
+                                            if (!dStr) return 'DD/MM/YYYY';
+                                            const parts = dStr.split('-');
+                                            if(parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+                                            return dStr;
+                                        })()}
+                                    </div>
+                                    <input type="date" value={form.date || form.billDate} onChange={e => setForm({ ...form, date: e.target.value, billDate: e.target.value })} style={{ opacity: 0, position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', cursor: 'pointer' }} />
+                                    <Calendar size={18} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: color, pointerEvents: 'none', opacity: 0.8 }} />
+                                </div>
                             </div>
+                            
+                            {type === 'border' && (
+                                <div className="premium-input-container">
+                                    <label>Valid Till</label>
+                                    <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center' }}>
+                                        <div style={{ fontSize: '15px', fontWeight: '600', color: form.validTill ? '#fff' : 'rgba(255,255,255,0.2)' }}>
+                                            {(() => {
+                                                const dStr = form.validTill;
+                                                if (!dStr) return 'DD/MM/YYYY';
+                                                const parts = dStr.split('-');
+                                                if(parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+                                                return dStr;
+                                            })()}
+                                        </div>
+                                        <input type="date" value={form.validTill || ''} onChange={e => setForm({ ...form, validTill: e.target.value })} style={{ opacity: 0, position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', cursor: 'pointer' }} />
+                                        <Calendar size={18} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: color, pointerEvents: 'none', opacity: 0.8 }} />
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {type === 'border' && (
-                            <div>
-                                <label className="premium-label" style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '900', marginBottom: '8px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Border Name</label>
-                                <input
-                                    type="text"
-                                    value={form.borderName}
-                                    onChange={e => setForm({ ...form, borderName: e.target.value })}
-                                    className="premium-compact-input"
-                                    placeholder="e.g. Delhi-Haryana"
-                                    style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '12px', color: '#fff' }}
-                                />
+                            <div className="premium-input-container">
+                                <label>Border Name</label>
+                                <input type="text" value={form.borderName} onChange={e => setForm({ ...form, borderName: e.target.value })} placeholder="e.g. Delhi-Haryana" />
                             </div>
                         )}
 
                         {type === 'services' && (
-                            <div>
-                                <label className="premium-label" style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '900', marginBottom: '8px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Service Category</label>
-                                <select 
-                                    value={form.category} 
-                                    onChange={e => setForm({ ...form, category: e.target.value })} 
-                                    className="premium-compact-input"
-                                    style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '12px', color: '#fff' }}
-                                >
-                                    <option>Car Wash</option>
-                                    <option>Puncture / Tyre</option>
-                                    <option>Cleaning Supplies</option>
-                                    <option>Periodic Service</option>
-                                    <option>Other Misc</option>
+                            <div className="premium-input-container">
+                                <label>Service Category</label>
+                                <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
+                                    <option style={{ background: '#0f172a' }}>Car Wash</option>
+                                    <option style={{ background: '#0f172a' }}>Puncture / Tyre</option>
+                                    <option style={{ background: '#0f172a' }}>Cleaning Supplies</option>
+                                    <option style={{ background: '#0f172a' }}>Periodic Service</option>
+                                    <option style={{ background: '#0f172a' }}>Other Misc</option>
                                 </select>
                             </div>
                         )}
 
-                        <div>
-                            <label className="premium-label" style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '900', marginBottom: '8px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Remarks / Notes</label>
-                            <textarea
-                                value={form.remarks}
-                                onChange={e => setForm({ ...form, remarks: e.target.value })}
-                                className="premium-compact-input"
-                                style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '12px', color: '#fff', height: '80px', resize: 'none' }}
-                                placeholder="Add specific details..."
-                            />
+                        <div className="premium-input-container">
+                            <label>Remarks / Notes</label>
+                            <textarea value={form.remarks} onChange={e => setForm({ ...form, remarks: e.target.value })} placeholder="Add specific details..." style={{ height: '60px', resize: 'none' }} />
                         </div>
 
                         <div>
-                            <label className="premium-label" style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '900', marginBottom: '8px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Attachment (Receipt/Bill)</label>
-                            <div 
-                                className="upload-zone"
-                                onClick={() => document.getElementById('file-upload').click()}
-                                style={{ 
-                                    border: '2px dashed rgba(255,255,255,0.12)', 
-                                    borderRadius: '18px', 
-                                    padding: '20px', 
-                                    textAlign: 'center',
-                                    cursor: 'pointer',
-                                    background: file ? `${color}08` : 'transparent',
-                                    transition: 'all 0.3s ease'
-                                }}
-                            >
-                                <input id="file-upload" type="file" hidden onChange={e => setFile(e.target.files[0])} />
-                                <Image size={24} style={{ color: file ? color : 'rgba(255,255,255,0.2)', marginBottom: '8px' }} />
-                                <div style={{ fontSize: '12px', fontWeight: '750', color: file ? '#fff' : 'rgba(255,255,255,0.4)' }}>
-                                    {file ? file.name : 'Click to upload image'}
-                                </div>
-                            </div>
+                            <ImageUploader file={file} onChange={setFile} label="Attach Receipt / Bill" color={color} />
                         </div>
 
-                        <button 
-                            onClick={handleSave} 
-                            disabled={submitting}
-                            className="btn-primary"
-                            style={{ background: color, color: '#000', padding: '16px', borderRadius: '18px', fontWeight: '1000', fontSize: '15px', marginTop: '10px', width: '100%', border: 'none', cursor: 'pointer', boxShadow: `0 8px 15px ${color}20` }}
-                        >
-                            {submitting ? 'PROCESSING...' : editingItem ? 'UPDATE RECORD' : 'SAVE ENTRY'}
-                        </button>
-                        {editingItem && (
+                        <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
                             <button 
-                                onClick={() => {
-                                    setEditingItem(null);
-                                }}
-                                style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.4)', padding: '12px', borderRadius: '15px', fontWeight: '750', fontSize: '13px', cursor: 'pointer' }}
+                                onClick={handleSave} 
+                                disabled={submitting}
+                                style={{ flex: 1, background: color, color: '#000', padding: '16px', borderRadius: '16px', fontWeight: '900', fontSize: '14px', border: 'none', cursor: 'pointer', boxShadow: `0 8px 25px ${color}30`, transition: 'all 0.3s ease', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}
                             >
-                                CANCEL EDIT
+                                {submitting ? <RefreshCw size={18} className="spin" /> : editingItem ? <CheckCircle2 size={18} /> : <Plus size={18} />}
+                                {submitting ? 'PROCESSING...' : editingItem ? 'UPDATE RECORD' : 'SAVE ENTRY'}
                             </button>
-                        )}
-                    </div>
-                </div>
-
-                <div className="history-section" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    <h4 style={{ margin: '0', fontSize: '16px', fontWeight: '900', color: 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <History size={18} /> RECENT LOGS
-                    </h4>
-                    
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '600px', overflowY: 'auto', paddingRight: '5px' }}>
-                        {hist.length === 0 ? (
-                            <div style={{ padding: '40px', textAlign: 'center', background: 'rgba(255,255,255,0.01)', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.03)' }}>
-                                <div style={{ opacity: 0.2, marginBottom: '10px' }}><History size={32} /></div>
-                                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', fontWeight: '700' }}>No records found in this cycle</div>
-                            </div>
-                        ) : hist.sort((a,b) => new Date(b.date || b.billDate) - new Date(a.date || a.billDate)).map(item => (
-                            <div key={item._id} className="history-item premium-card" style={{ padding: '20px', borderRadius: '22px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div>
-                                    <div style={{ fontSize: '14px', fontWeight: '1000', color: '#fff' }}>₹{Number(item.amount).toLocaleString()}</div>
-                                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontWeight: '700', marginTop: '2px' }}>
-                                        {formatDateIST(item.date || item.billDate)} • {item.method || item.paymentMode || 'Manual'}
-                                    </div>
-                                    {(item.remarks || item.borderName) && (
-                                        <div style={{ fontSize: '10px', color: color, fontWeight: '750', marginTop: '6px', opacity: 0.9 }}>
-                                            {item.remarks} {item.borderName ? `(${item.borderName})` : ''}
-                                        </div>
-                                    )}
-                                </div>
-                                <div style={{ display: 'flex', gap: '8px' }}>
-                                    {(item.receiptPhoto || item.billPhoto) && (
-                                        <button onClick={() => setViewingImage(getImageUrl(item.receiptPhoto || item.billPhoto))} className="icon-btn-sm" style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', border: 'none', padding: '8px', borderRadius: '10px', cursor: 'pointer' }}>
-                                            <Image size={14} />
-                                        </button>
-                                    )}
-                                    <button onClick={() => {
-                                        setEditingItem(item);
-                                    }} className="icon-btn-sm" style={{ background: 'rgba(255,255,255,0.05)', color: '#fbbf24', border: 'none', padding: '8px', borderRadius: '10px', cursor: 'pointer' }}>
-                                        <Edit2 size={14} />
-                                    </button>
-                                    <button onClick={() => onDelete(item._id)} className="icon-btn-sm" style={{ background: 'rgba(244, 63, 94, 0.1)', color: '#f43f5e', border: 'none', padding: '8px', borderRadius: '10px', cursor: 'pointer' }}>
-                                        <Trash2 size={14} />
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
+                            
+                            {editingItem && (
+                                <button 
+                                    onClick={() => setEditingItem(null)}
+                                    style={{ background: 'rgba(255,255,255,0.05)', color: 'white', padding: '16px 24px', borderRadius: '16px', fontWeight: '800', fontSize: '13px', border: 'none', cursor: 'pointer', transition: 'background 0.2s' }}
+                                >
+                                    CANCEL
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1292,3 +1306,4 @@ const ManagerHub = ({ type, color, act, drivers, onAdd, onUpdate, onDelete, setV
 };
 
 export default CarUtility;
+

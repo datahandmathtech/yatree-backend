@@ -20,7 +20,7 @@ import {
 } from '../utils/istUtils';
 import PremiumDateInput from '../components/common/PremiumDateInput';
 
-const DriverSalaries = ({ isSubComponent = false }) => {
+const DriverSalaries = ({ isSubComponent = false, driverType = 'Taxi', onStatsUpdate }) => {
     const { selectedCompany } = useCompany();
     useEffect(() => {
         const style = document.createElement('style');
@@ -203,12 +203,12 @@ const DriverSalaries = ({ isSubComponent = false }) => {
         setLoading(true);
         try {
             const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-            let url = `/api/admin/salary-summary/${selectedCompany._id}`;
+            let url = `/api/admin/salary-summary/${selectedCompany._id}?driverType=${driverType}`;
             if (month === 'All') {
-                url += `?from=${year}-04-01&to=${year + 1}-03-31`;
+                url += `&from=${year}-04-01&to=${year + 1}-03-31`;
             } else {
                 const calendarYear = (month >= 1 && month <= 3) ? year + 1 : year;
-                url += `?month=${month}&year=${calendarYear}`;
+                url += `&month=${month}&year=${calendarYear}`;
             }
             const { data } = await axios.get(url, {
                 headers: { Authorization: `Bearer ${userInfo.token}` }
@@ -222,7 +222,7 @@ const DriverSalaries = ({ isSubComponent = false }) => {
         if (!selectedCompany?._id) return;
         try {
             const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-            let query = `isFreelancer=false`;
+            let query = `isFreelancer=false&driverType=${driverType}`;
             if (month === 'All') {
                 query += `&from=${year}-04-01&to=${year + 1}-03-31`;
             } else {
@@ -234,7 +234,7 @@ const DriverSalaries = ({ isSubComponent = false }) => {
                 axios.get(`/api/admin/advances/${selectedCompany._id}?${query}`, {
                     headers: { Authorization: `Bearer ${userInfo.token}` }
                 }),
-                axios.get(`/api/admin/drivers/${selectedCompany._id}?usePagination=false&isFreelancer=false&status=active`, {
+                axios.get(`/api/admin/drivers/${selectedCompany._id}?usePagination=false&isFreelancer=false&status=active&driverType=${driverType}`, {
                     headers: { Authorization: `Bearer ${userInfo.token}` }
                 })
             ]);
@@ -248,7 +248,7 @@ const DriverSalaries = ({ isSubComponent = false }) => {
         setLoansLoading(true);
         try {
             const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-            const { data } = await axios.get(`/api/admin/loans/${selectedCompany._id}`, {
+            const { data } = await axios.get(`/api/admin/loans/${selectedCompany._id}?driverType=${driverType}`, {
                 headers: { Authorization: `Bearer ${userInfo.token}` }
             });
             setLoans(data || []);
@@ -263,12 +263,12 @@ const DriverSalaries = ({ isSubComponent = false }) => {
         if (!selectedCompany?._id) return;
         try {
             const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-            let url = `/api/admin/allowances/${selectedCompany._id}`;
+            let url = `/api/admin/allowances/${selectedCompany._id}?driverType=${driverType}`;
             if (month === 'All') {
-                url += `?from=${year}-04-01&to=${year + 1}-03-31`;
+                url += `&from=${year}-04-01&to=${year + 1}-03-31`;
             } else {
                 const calendarYear = (month >= 1 && month <= 3) ? year + 1 : year;
-                url += `?month=${month}&year=${calendarYear}`;
+                url += `&month=${month}&year=${calendarYear}`;
             }
             const { data } = await axios.get(url, {
                 headers: { Authorization: `Bearer ${userInfo.token}` }
@@ -280,13 +280,14 @@ const DriverSalaries = ({ isSubComponent = false }) => {
     const filteredLoans = useMemo(() => {
         if (!loans) return [];
 
-        let processedLoans = loans;
+        const validDriverIds = new Set(drivers.map(d => d._id));
+        let processedLoans = loans.filter(loan => validDriverIds.has(loan.driver?._id || loan.driver));
 
         if (month === 'All') {
             const fyStartValue = (year * 12) + 4; // April of start year
             const fyEndValue = ((year + 1) * 12) + 3; // March of end year
 
-            processedLoans = loans.filter(loan => {
+            processedLoans = processedLoans.filter(loan => {
                 if (!loan.startDate) return true;
                 const start = new Date(loan.startDate);
                 const loanStartValue = (start.getFullYear() * 12) + (start.getMonth() + 1);
@@ -304,7 +305,7 @@ const DriverSalaries = ({ isSubComponent = false }) => {
             const currentYearNum = Number(calendarYear);
             const selectedMonthValue = (currentYearNum * 12) + currentMonthNum;
 
-            processedLoans = loans.filter(loan => {
+            processedLoans = processedLoans.filter(loan => {
                 if (!loan.startDate) return true;
                 const start = new Date(loan.startDate);
                 const loanStartValue = (start.getFullYear() * 12) + (start.getMonth() + 1);
@@ -327,7 +328,7 @@ const DriverSalaries = ({ isSubComponent = false }) => {
                 l.driver?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 l.remarks?.toLowerCase().includes(searchTerm.toLowerCase())
             )
-            .sort((a, b) => (a.driver?.name || '').localeCompare(b.driver?.name || ''));
+            .sort((a, b) => new Date(b.createdAt || b.startDate || 0) - new Date(a.createdAt || a.startDate || 0));
     }, [loans, month, year, searchTerm]);
 
     const handleRecordLoan = async (e) => {
@@ -436,8 +437,9 @@ const DriverSalaries = ({ isSubComponent = false }) => {
 
     const handleEditClick = (advance) => {
         setEditingAdvanceId(advance._id);
+        const dInfo = selectedDriverDetails?.driver?.name ? selectedDriverDetails.driver : (selectedDriverDetails?.driver?.[0] || {});
         setAdvanceFormData({
-            driverId: advance.driver?._id || '',
+            driverId: advance.driver?._id || advance.driver || dInfo?._id || '',
             amount: advance.amount || '',
             date: advance.date ? toISTDateString(advance.date) : '',
             remark: advance.remark || ''
@@ -669,11 +671,11 @@ const DriverSalaries = ({ isSubComponent = false }) => {
             doc.setFont('helvetica', 'bold');
             doc.text('DUTY & TRIP DETAILS', 15, 115);
 
-            const showSDR = (driverInfo.sameDayReturnBonus > 0 || driverInfo.sameDayReturnEnabled);
-            const showNight = (driverInfo.nightStayBonus > 0);
+            const showSDR = driverType !== 'Bus' && (driverInfo.sameDayReturnBonus > 0 || driverInfo.sameDayReturnEnabled);
+            const showNight = driverType !== 'Bus' && (driverInfo.nightStayBonus > 0);
 
             const tableHeader = ['DATE', 'WAGE'];
-            if (showSDR) tableHeader.push('SAME DAY');
+            if (showSDR) tableHeader.push('DA');
             if (showNight) tableHeader.push('NIGHT STAY');
             tableHeader.push('PARKING', 'TOTAL');
 
@@ -848,7 +850,8 @@ const DriverSalaries = ({ isSubComponent = false }) => {
     const handleQuickDownload = async (driverId) => {
         try {
             const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-            const { data } = await axios.get(`/api/admin/salary-details/${driverId}?month=${month}&year=${year}`, {
+            const calendarYear = (month >= 1 && month <= 3) ? year + 1 : year;
+            const { data } = await axios.get(`/api/admin/salary-details/${driverId}?month=${month}&year=${calendarYear}&driverType=${driverType}`, {
                 headers: { Authorization: `Bearer ${userInfo.token}` }
             });
             handleExportPDF(data);
@@ -888,27 +891,56 @@ const DriverSalaries = ({ isSubComponent = false }) => {
         )
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
+    const validDriverIds = new Set(drivers.map(d => d._id));
+
     const filteredAdvances = advances
+        .filter(a => validDriverIds.has(a.driver?._id || a.driver))
         .filter(a =>
             a.driver?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             a.remark?.toLowerCase().includes(searchTerm.toLowerCase())
         )
-        .sort((a, b) => (a.driver?.name || '').localeCompare(b.driver?.name || ''));
+        .sort((a, b) => new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0));
 
 
 
     const filteredAllowances = (allowances || [])
+        .filter(a => validDriverIds.has(a.driver?._id || a.driver))
         .filter(a =>
             a.driver?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             a.remark?.toLowerCase().includes(searchTerm.toLowerCase())
         )
-        .sort((a, b) => (a.driver?.name || '').localeCompare(b.driver?.name || ''));
+        .sort((a, b) => new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0));
 
     const totalGrossEarnings = filteredSalaries.reduce((sum, s) => sum + (s.totalEarned || 0), 0);
     const totalNetPayout = filteredSalaries.reduce((sum, s) => sum + (s.netPayable || 0), 0);
     const totalSpecialPay = filteredSalaries.reduce((sum, s) => sum + (s.totalAllowances || 0), 0);
     const totalAdvancesTotal = filteredSalaries.reduce((sum, s) => sum + (s.totalAdvances || 0), 0);
     const totalEMITotal = filteredSalaries.reduce((sum, s) => sum + (s.totalEMI || 0), 0);
+    const totalSDRAmount = filteredSalaries.reduce((sum, s) => sum + (Number(s.totalSameDayAmount) || 0), 0);
+    const totalNightsAmount = filteredSalaries.reduce((sum, s) => sum + (Number(s.totalNightStayAmount) || 0), 0);
+    const totalSDRCount = filteredSalaries.reduce((sum, s) => sum + (Number(s.sameDayCount) || 0), 0);
+    const totalNightsCount = filteredSalaries.reduce((sum, s) => sum + (Number(s.nightStayCount) || 0), 0);
+
+    useEffect(() => {
+        if (onStatsUpdate) {
+            const sdrBreakdown = filteredSalaries
+                .filter(s => (Number(s.sameDayCount) || 0) > 0)
+                .map(s => ({ name: s.name, count: s.sameDayCount, amount: s.totalSameDayAmount }));
+                
+            const nightsBreakdown = filteredSalaries
+                .filter(s => (Number(s.nightStayCount) || 0) > 0)
+                .map(s => ({ name: s.name, count: s.nightStayCount, amount: s.totalNightStayAmount }));
+
+            onStatsUpdate({ 
+                sdr: totalSDRAmount, 
+                nights: totalNightsAmount,
+                sdrCount: totalSDRCount,
+                nightsCount: totalNightsCount,
+                sdrBreakdown,
+                nightsBreakdown
+            });
+        }
+    }, [filteredSalaries, totalSDRAmount, totalNightsAmount, totalSDRCount, totalNightsCount, onStatsUpdate]);
 
     const det = selectedDriverDetails;
     const dInfo = det?.driver?.name ? det.driver : (det?.driver?.[0] || {});
@@ -927,7 +959,10 @@ const DriverSalaries = ({ isSubComponent = false }) => {
     const calcOtherBonuses = breakdown.reduce((s, d) => s + (d.otherBonuses || 0), 0);
 
     // Combined Routine Earnings (Everything related to duties)
-    const routineEarningsTotal = calcWages + calcSDR + calcNight + calcOT + calcSpecialPay + calcOtherBonuses;
+    const busDetails = summary.busDriverDetails || {};
+    const routineEarningsTotal = driverType === 'Bus' 
+        ? Math.max(0, (busDetails.baseSalary || 0) - (busDetails.deduction || 0)) + calcOT + calcSpecialPay + calcOtherBonuses
+        : calcWages + calcSDR + calcNight + calcOT + calcSpecialPay + calcOtherBonuses;
 
     // Other Adjustments
     const totalAllowances = summary.totalAllowances || 0;
@@ -939,8 +974,8 @@ const DriverSalaries = ({ isSubComponent = false }) => {
     const netPayable = grossPayroll - totalAdvances - totalEMI;
 
     // Visibility logic for Bonuses - Restore to visible by default for Drivers as requested
-    const showSDR = dInfo.role === 'Driver' || dInfo.sameDayReturnBonus > 0 || dInfo.sameDayReturnEnabled || calcSDR > 0;
-    const showNight = dInfo.role === 'Driver' || dInfo.nightStayBonus > 0 || calcNight > 0;
+    const showSDR = driverType !== 'Bus' && (dInfo.role === 'Driver' || dInfo.sameDayReturnBonus > 0 || dInfo.sameDayReturnEnabled || calcSDR > 0);
+    const showNight = driverType !== 'Bus' && (dInfo.role === 'Driver' || dInfo.nightStayBonus > 0 || calcNight > 0);
 
     return (
         <div className={isSubComponent ? "sub-component" : "container-fluid"} style={{ paddingBottom: '40px' }}>
@@ -1018,7 +1053,7 @@ const DriverSalaries = ({ isSubComponent = false }) => {
                                     outline: 'none', cursor: 'pointer'
                                 }}
                             >
-                                {[2023, 2024, 2025, 2026, 2027].map(y => (
+                                {Array.from({ length: new Date().getFullYear() - 2023 + 5 }, (_, i) => 2023 + i).map(y => (
                                     <option key={y} value={y} style={{ background: '#0f172a' }}>
                                         {y}-{String(y + 1).slice(-2)}
                                     </option>
@@ -1120,7 +1155,7 @@ const DriverSalaries = ({ isSubComponent = false }) => {
                                     outline: 'none', cursor: 'pointer'
                                 }}
                             >
-                                {[2023, 2024, 2025, 2026, 2027].map(y => (
+                                {Array.from({ length: new Date().getFullYear() - 2023 + 5 }, (_, i) => 2023 + i).map(y => (
                                     <option key={y} value={y} style={{ background: '#0f172a' }}>
                                         {y}-{String(y + 1).slice(-2)}
                                     </option>
@@ -1154,6 +1189,33 @@ const DriverSalaries = ({ isSubComponent = false }) => {
             )}
             {/* SUMMARY CARDS - ACTING AS NAVIGATION */}
             <div className="stats-grid">
+                <div
+                    onClick={() => setActiveTab('payroll')}
+                    className="glass-card glass-card-hover-effect"
+                    style={{
+                        flex: '1',
+                        minWidth: '240px',
+                        maxWidth: '400px',
+                        padding: '24px',
+                        cursor: 'pointer',
+                        background: 'linear-gradient(135deg, rgba(168,85,247,0.2) 0%, rgba(168,85,247,0.1) 100%)',
+                        border: '1px solid rgba(168,85,247,0.2)',
+                        transition: 'all 0.3s ease'
+                    }}
+                >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                            <p style={{ fontSize: '12px', fontWeight: '800', color: '#a855f7', marginBottom: '8px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                Total Salary
+                            </p>
+                            <h3 style={{ fontSize: '28px', fontWeight: '950', color: 'white', margin: 0 }}>₹ {salaries.reduce((sum, s) => sum + (s.totalEarned || 0), 0).toLocaleString()}</h3>
+                        </div>
+                        <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(168,85,247,0.1)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                            <IndianRupee size={20} color="#a855f7" />
+                        </div>
+                    </div>
+                </div>
+
                 <div
                     onClick={() => setActiveTab('payroll')}
                     className={`glass-card ${activeTab === 'payroll' ? 'active-nav-card' : 'glass-card-hover-effect'}`}
@@ -1939,28 +2001,32 @@ const DriverSalaries = ({ isSubComponent = false }) => {
                                         {/* ─── SUMMARY CARDS ─── */}
                                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '28px' }}>
                                             {/* GROSS PAYROLL SUBTOTAL CARD */}
-                                            <div style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(30,41,59,0.5))', border: '2px solid #10b981', borderRadius: '12px', padding: '14px' }}>
+                                            {driverType !== 'Bus' && (
+                                                <div style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(30,41,59,0.5))', border: '2px solid #10b981', borderRadius: '12px', padding: '14px' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
                                                     <TrendingDown size={14} color="#10b981" style={{ transform: 'rotate(180deg)' }} />
                                                     <span style={{ fontSize: '10px', color: '#10b981', fontWeight: '900', textTransform: 'uppercase' }}>Gross Payroll</span>
                                                 </div>
                                                 <div style={{ color: 'white', fontWeight: '900', fontSize: '22px' }}>₹{grossPayroll.toLocaleString()}</div>
                                                 <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)', marginTop: '2px', fontWeight: '700' }}>TOTAL EARNINGS (MATCHED)</div>
-                                            </div>
-                                            <div style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)', borderRadius: '12px', padding: '14px' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                                                    <Car size={14} color="#38bdf8" />
-                                                    <span style={{ fontSize: '10px', color: '#38bdf8', fontWeight: '800', textTransform: 'uppercase' }}>Routine Earnings</span>
                                                 </div>
-                                                <div style={{ color: 'white', fontWeight: '900', fontSize: '20px' }}>₹{routineEarningsTotal.toLocaleString()}</div>
-                                                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
-                                                    Wages: ₹{calcWages.toLocaleString()}
-                                                    {showSDR && ` + SDR: ₹${calcSDR.toLocaleString()}`}
-                                                    {showNight && ` + Night: ₹${calcNight.toLocaleString()}`}
-                                                    {calcOT > 0 && ` + OT: ₹${calcOT.toLocaleString()}`}
-                                                    {(calcSpecialPay > 0 || calcOtherBonuses > 0) && ` + Extra: ₹${(calcSpecialPay + calcOtherBonuses).toLocaleString()}`}
+                                            )}
+                                            {driverType !== 'Bus' && (
+                                                <div style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)', borderRadius: '12px', padding: '14px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                                                        <Car size={14} color="#38bdf8" />
+                                                        <span style={{ fontSize: '10px', color: '#38bdf8', fontWeight: '800', textTransform: 'uppercase' }}>Routine Earnings</span>
+                                                    </div>
+                                                    <div style={{ color: 'white', fontWeight: '900', fontSize: '20px' }}>₹{routineEarningsTotal.toLocaleString()}</div>
+                                                    <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
+                                                        Wages: ₹{calcWages.toLocaleString()}
+                                                        {showSDR && ` + DA: ₹${calcSDR.toLocaleString()}`}
+                                                        {showNight && ` + Night: ₹${calcNight.toLocaleString()}`}
+                                                        {calcOT > 0 && ` + OT: ₹${calcOT.toLocaleString()}`}
+                                                        {(calcSpecialPay > 0 || calcOtherBonuses > 0) && ` + Extra: ₹${(calcSpecialPay + calcOtherBonuses).toLocaleString()}`}
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            )}
 
                                             {/* Parking Reimbursements */}
                                             <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '12px', padding: '14px' }}>
@@ -2023,26 +2089,63 @@ const DriverSalaries = ({ isSubComponent = false }) => {
                                                 <thead>
                                                     <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                                                         <th style={{ padding: '12px', textAlign: 'left', color: 'var(--text-muted)' }}>Date</th>
-                                                        <th style={{ padding: '12px', textAlign: 'right', color: 'var(--text-muted)' }}>WAGES</th>
-                                                        {showSDR && <th style={{ padding: '12px', textAlign: 'right', color: 'var(--text-muted)' }}>SDR</th>}
+                                                        {driverType !== 'Bus' ? (
+                                                            <th style={{ padding: '12px', textAlign: 'right', color: 'var(--text-muted)' }}>WAGES</th>
+                                                        ) : (
+                                                            <th style={{ padding: '12px', textAlign: 'center', color: 'var(--text-muted)' }}>STATUS</th>
+                                                        )}
+                                                        {showSDR && <th style={{ padding: '12px', textAlign: 'right', color: 'var(--text-muted)' }}>DA</th>}
                                                         {showNight && <th style={{ padding: '12px', textAlign: 'right', color: 'var(--text-muted)' }}>Night</th>}
                                                         <th style={{ padding: '12px', textAlign: 'right', color: 'var(--text-muted)' }}>Parking</th>
-                                                        <th style={{ padding: '12px', textAlign: 'right', color: 'white' }}>Day Total</th>
+                                                        {driverType !== 'Bus' && (
+                                                            <th style={{ padding: '12px', textAlign: 'right', color: 'white' }}>Day Total</th>
+                                                        )}
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {det?.breakdown?.map((day, idx) => (
+                                                    {(() => {
+                                                        let calendarRows = det?.breakdown || [];
+                                                        if (driverType === 'Bus' && month !== 'All') {
+                                                            const m = parseInt(month, 10);
+                                                            const y = parseInt(year, 10);
+                                                            const daysInMonth = new Date(y, m, 0).getDate();
+                                                            const breakdownMap = new Map();
+                                                            calendarRows.forEach(d => {
+                                                                if (d.date) {
+                                                                    const dateStr = typeof d.date === 'string' ? d.date.substring(0, 10) : new Date(d.date).toISOString().substring(0, 10);
+                                                                    breakdownMap.set(dateStr, d);
+                                                                }
+                                                            });
+                                                            const paddedRows = [];
+                                                            for (let i = 1; i <= daysInMonth; i++) {
+                                                                const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                                                                if (breakdownMap.has(dateStr)) {
+                                                                    paddedRows.push(breakdownMap.get(dateStr));
+                                                                } else {
+                                                                    paddedRows.push({ date: dateStr, isAbsent: true, type: 'Absent' });
+                                                                }
+                                                            }
+                                                            calendarRows = paddedRows;
+                                                        }
+                                                        return calendarRows;
+                                                    })().map((day, idx) => (
                                                         <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                                                             <td style={{ padding: '12px', color: 'white' }}>
                                                                 {formatDateIST(day.date)}
                                                                 <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{day.type || 'Duty'}</div>
                                                                 {day.remarks && <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)' }}>{day.remarks}</div>}
                                                             </td>
-                                                            <td style={{ padding: '12px', textAlign: 'right', color: 'rgba(255,255,255,0.7)' }}>₹{day.wage || 0}</td>
+                                                            {driverType !== 'Bus' ? (
+                                                                <td style={{ padding: '12px', textAlign: 'right', color: 'rgba(255,255,255,0.7)' }}>₹{day.wage || 0}</td>
+                                                            ) : (
+                                                                <td style={{ padding: '12px', textAlign: 'center', color: day.isAbsent ? '#f43f5e' : '#10b981', fontWeight: '700' }}>{day.isAbsent ? 'Absent' : 'Present'}</td>
+                                                            )}
                                                             {showSDR && <td style={{ padding: '12px', textAlign: 'right', color: '#38bdf8', fontWeight: '600' }}>₹{day.sameDayReturn || 0}</td>}
                                                             {showNight && <td style={{ padding: '12px', textAlign: 'right', color: '#10b981', fontWeight: '600' }}>₹{day.nightStay || 0}</td>}
                                                             <td style={{ padding: '12px', textAlign: 'right', color: 'var(--primary)', fontWeight: '800' }}>₹{day.parking || 0}</td>
-                                                            <td style={{ padding: '12px', textAlign: 'right', color: '#10b981', fontWeight: '700' }}>₹{(day.total || 0).toLocaleString()}</td>
+                                                            {driverType !== 'Bus' && (
+                                                                <td style={{ padding: '12px', textAlign: 'right', color: '#10b981', fontWeight: '700' }}>₹{(day.total || 0).toLocaleString()}</td>
+                                                            )}
                                                         </tr>
                                                     ))}
                                                     {/* Standalone Parking Entries */}
@@ -2056,11 +2159,17 @@ const DriverSalaries = ({ isSubComponent = false }) => {
                                                                 <div style={{ fontSize: '10px', color: 'var(--primary)', fontWeight: '800' }}>STANDALONE PARKING</div>
                                                                 {p.remark && <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)' }}>{p.remark}</div>}
                                                             </td>
-                                                            <td style={{ padding: '12px', textAlign: 'right', color: 'var(--text-muted)' }}>-</td>
+                                                            {driverType !== 'Bus' ? (
+                                                                <td style={{ padding: '12px', textAlign: 'right', color: 'var(--text-muted)' }}>-</td>
+                                                            ) : (
+                                                                <td style={{ padding: '12px', textAlign: 'center', color: '#f43f5e', fontWeight: '700' }}>Absent</td>
+                                                            )}
                                                             {showSDR && <td style={{ padding: '12px', textAlign: 'right', color: 'var(--text-muted)' }}>-</td>}
                                                             {showNight && <td style={{ padding: '12px', textAlign: 'right', color: 'var(--text-muted)' }}>-</td>}
                                                             <td style={{ padding: '12px', textAlign: 'right', color: 'var(--primary)', fontWeight: '800' }}>₹{p.amount || 0}</td>
-                                                            <td style={{ padding: '12px', textAlign: 'right', color: '#10b981', fontWeight: '700' }}>₹{(p.amount || 0).toLocaleString()}</td>
+                                                            {driverType !== 'Bus' && (
+                                                                <td style={{ padding: '12px', textAlign: 'right', color: '#10b981', fontWeight: '700' }}>₹{(p.amount || 0).toLocaleString()}</td>
+                                                            )}
                                                         </tr>
                                                     ))}
                                                     {det?.breakdown?.length === 0 && (
@@ -2070,11 +2179,17 @@ const DriverSalaries = ({ isSubComponent = false }) => {
                                                     {breakdown.length > 0 && (
                                                         <tr style={{ background: 'rgba(255,255,255,0.02)', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                                                             <td style={{ padding: '12px', fontWeight: '800', color: 'white' }}>COLUMN TOTALS</td>
-                                                            <td style={{ padding: '12px', textAlign: 'right', fontWeight: '800', color: 'rgba(255,255,255,0.7)' }}>₹{calcWages.toLocaleString()}</td>
+                                                            {driverType !== 'Bus' ? (
+                                                                <td style={{ padding: '12px', textAlign: 'right', fontWeight: '800', color: 'rgba(255,255,255,0.7)' }}>₹{calcWages.toLocaleString()}</td>
+                                                            ) : (
+                                                                <td style={{ padding: '12px', textAlign: 'center', fontWeight: '800', color: 'rgba(255,255,255,0.7)' }}>-</td>
+                                                            )}
                                                             {showSDR && <td style={{ padding: '12px', textAlign: 'right', fontWeight: '800', color: '#38bdf8' }}>₹{calcSDR.toLocaleString()}</td>}
                                                             {showNight && <td style={{ padding: '12px', textAlign: 'right', fontWeight: '800', color: '#10b981' }}>₹{calcNight.toLocaleString()}</td>}
                                                             <td style={{ padding: '12px', textAlign: 'right', fontWeight: '800', color: 'var(--primary)' }}>₹{calcParking.toLocaleString()}</td>
-                                                            <td style={{ padding: '12px', textAlign: 'right', fontWeight: '900', color: '#10b981' }}>₹{(routineEarningsTotal + calcParking).toLocaleString()}</td>
+                                                            {driverType !== 'Bus' && (
+                                                                <td style={{ padding: '12px', textAlign: 'right', fontWeight: '900', color: '#10b981' }}>₹{(routineEarningsTotal + calcParking).toLocaleString()}</td>
+                                                            )}
                                                         </tr>
                                                     )}
                                                     {/* Wages Subtotal row */}
@@ -2112,7 +2227,7 @@ const DriverSalaries = ({ isSubComponent = false }) => {
                                                             <td style={{ padding: '12px', textAlign: 'right', color: '#10b981', fontWeight: '700' }}>₹{al.amount}</td>
                                                             <td style={{ padding: '12px', textAlign: 'center' }}>
                                                                 <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
-                                                                    <button onClick={() => { setShowDetailModal(false); handleEditAllowance(al); }} style={{ background: 'transparent', border: 'none', color: '#38bdf8', cursor: 'pointer' }}><Edit2 size={13} /></button>
+                                                                    <button onClick={() => { handleEditAllowance(al); }} style={{ background: 'transparent', border: 'none', color: '#38bdf8', cursor: 'pointer' }}><Edit2 size={13} /></button>
                                                                     <button onClick={() => { if (window.confirm('Delete this payout?')) handleDeleteAllowance(al._id); }} style={{ background: 'transparent', border: 'none', color: '#f43f5e', cursor: 'pointer' }}><X size={14} /></button>
                                                                 </div>
                                                             </td>
@@ -2145,7 +2260,7 @@ const DriverSalaries = ({ isSubComponent = false }) => {
                                                             <td style={{ padding: '12px', textAlign: 'right', color: '#f43f5e', fontWeight: '700' }}>₹{adv.amount}</td>
                                                             <td style={{ padding: '12px', textAlign: 'center' }}>
                                                                 <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
-                                                                    <button onClick={() => { setShowDetailModal(false); handleEditClick(adv); }} style={{ background: 'transparent', border: 'none', color: '#38bdf8', padding: '4px', cursor: 'pointer' }} title="Edit"><Edit2 size={13} /></button>
+                                                                    <button onClick={() => { handleEditClick(adv); }} style={{ background: 'transparent', border: 'none', color: '#38bdf8', padding: '4px', cursor: 'pointer' }} title="Edit"><Edit2 size={13} /></button>
                                                                     <button onClick={() => handleDeleteAdvance(adv._id)} style={{ background: 'transparent', border: 'none', color: '#f43f5e', padding: '4px', cursor: 'pointer' }} title="Delete"><X size={14} /></button>
                                                                 </div>
                                                             </td>
@@ -2175,9 +2290,16 @@ const DriverSalaries = ({ isSubComponent = false }) => {
                                                     {det?.loans?.map((loan, idx) => {
                                                         const sDate = new Date(loan.startDate);
                                                         const sVal = (sDate.getFullYear() * 12) + (sDate.getMonth() + 1);
-                                                        const selVal = (parseInt(year) * 12) + parseInt(month);
-                                                        const monthIdx = (selVal - sVal) + 1;
+                                                        const calendarYear = (parseInt(month) >= 1 && parseInt(month) <= 3) ? parseInt(year) + 1 : parseInt(year);
+                                                        const selVal = (calendarYear * 12) + parseInt(month);
+                                                        let monthIdx = (selVal - sVal) + 1;
+                                                        
                                                         const tenure = parseInt(loan.tenureMonths, 10) || (loan.monthlyEMI > 0 ? Math.round(loan.totalAmount / loan.monthlyEMI) : 1);
+                                                        
+                                                        // Ensure monthIdx isn't negative and doesn't exceed tenure for UI display
+                                                        const displayMonthIdx = Math.max(1, Math.min(monthIdx, tenure));
+                                                        
+                                                        const histRem = Math.max(0, loan.totalAmount - (loan.monthlyEMI * monthIdx));
 
                                                         return (
                                                             <tr key={loan._id || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
@@ -2185,17 +2307,11 @@ const DriverSalaries = ({ isSubComponent = false }) => {
                                                                 <td style={{ padding: '12px', textAlign: 'right', color: 'rgba(255,255,255,0.6)' }}>₹{loan.totalAmount?.toLocaleString()}</td>
                                                                 <td style={{ padding: '12px', textAlign: 'right', color: 'white', fontWeight: '700' }}>₹{loan.monthlyEMI?.toLocaleString()}</td>
                                                                 <td style={{ padding: '12px', textAlign: 'right', color: '#f43f5e', fontWeight: '800' }}>
-                                                                    {(() => {
-                                                                        const calendarYear = (month >= 1 && month <= 3) ? year + 1 : year;
-                                                                        const selVal = (parseInt(calendarYear) * 12) + parseInt(month);
-                                                                        const mIdx = (selVal - sVal) + 1;
-                                                                        const histRem = Math.max(0, loan.totalAmount - (loan.monthlyEMI * mIdx));
-                                                                        return `₹ ${histRem.toLocaleString()}`;
-                                                                    })()}
+                                                                    ₹ {histRem.toLocaleString()}
                                                                 </td>
                                                                 <td style={{ padding: '12px', textAlign: 'center' }}>
                                                                     <span style={{ fontSize: '10px', background: 'rgba(129, 140, 248, 0.1)', color: '#818cf8', padding: '2px 8px', borderRadius: '4px', fontWeight: '900' }}>
-                                                                        {loan.status === 'Completed' ? 'DONE' : `MONTH ${monthIdx}/${tenure}`}
+                                                                        {loan.status === 'Completed' || histRem === 0 ? 'DONE' : `MONTH ${displayMonthIdx}/${tenure}`}
                                                                     </span>
                                                                 </td>
                                                             </tr>
@@ -2286,4 +2402,5 @@ const DriverSalaries = ({ isSubComponent = false }) => {
 };
 
 export default DriverSalaries;
+
 

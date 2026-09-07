@@ -10,6 +10,7 @@ import { useCompany } from '../context/CompanyContext';
 import { useTheme } from '../context/ThemeContext';
 import SEO from '../components/SEO';
 import PremiumDateInput from '../components/common/PremiumDateInput';
+import SearchableSelect from '../components/common/SearchableSelect';
 import { todayIST, toISTDateString, firstDayOfMonthIST, formatDateIST, nowIST, formatDateTimeIST } from '../utils/istUtils';
 
 
@@ -87,7 +88,7 @@ const CameraModal = ({ onCapture, onClose }) => {
 };
 
 const FuelPage = () => {
-    const { isDark } = useTheme();
+    const { theme } = useTheme();
     const { selectedCompany } = useCompany();
     const getImageUrl = (path) => {
         if (!path) return '';
@@ -104,13 +105,26 @@ const FuelPage = () => {
     const [showModal, setShowModal] = useState(false);
     const [showApprovalModal, setShowApprovalModal] = useState(false);
     const [drivers, setDrivers] = useState([]);
+    const [clients, setClients] = useState([]);
+
     const [selectedPending, setSelectedPending] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterVehicle, setFilterVehicle] = useState('All');
+    const [filterPaymentSource, setFilterPaymentSource] = useState('All');
+    const [payerSearch, setPayerSearch] = useState('');
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [fromDate, setFromDate] = useState('');
     const [toDate, setToDate] = useState('');
+    const [page, setPage] = useState(1);
+    
+    // Custom Vehicle Dropdown States
+    const [showVehicleDropdown, setShowVehicleDropdown] = useState(false);
+    const [expandedModel, setExpandedModel] = useState(null);
+    const [vehicleSearchQuery, setVehicleSearchQuery] = useState('');
+    const dropdownRef = useRef(null);
+    const paymentFilterRef = useRef(null);
+    const [showPaymentFilter, setShowPaymentFilter] = useState(false);
     const location = useLocation();
 
     useEffect(() => {
@@ -133,10 +147,26 @@ const FuelPage = () => {
             paymentMode: 'Cash',
             paymentSource: 'Office',
             paymentBy: '',
+            client: '',
+            drsDuty: '',
             driver: '',
             slipPhoto: ''
         });
     }, [location.pathname, location.key]);
+
+    // Handle click outside for dropdown
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setShowVehicleDropdown(false);
+            }
+            if (paymentFilterRef.current && !paymentFilterRef.current.contains(event.target)) {
+                setShowPaymentFilter(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     // ── AI AGENT SEARCH INTEGRATION ──
     useEffect(() => {
@@ -196,7 +226,7 @@ const FuelPage = () => {
         stationName: '',
         paymentMode: 'Cash',
         paymentSource: 'Office',
-            paymentBy: '',
+        paymentBy: '',
         driver: '',
         slipPhoto: ''
     });
@@ -212,8 +242,22 @@ const FuelPage = () => {
             fetchVehicles();
             fetchPendingEntries();
             fetchDrivers();
+            fetchClients();
+
         }
     }, [selectedCompany, fromDate, toDate]);
+
+    const fetchClients = async () => {
+        if (!selectedCompany?._id) return;
+        try {
+            const { data } = await axios.get(`/api/clients/company/${selectedCompany._id}`);
+            setClients(data);
+        } catch (error) {
+            console.error('Failed to fetch clients', error);
+        }
+    };
+
+
 
     const fetchPendingEntries = async () => {
         if (!selectedCompany?._id) return;
@@ -250,33 +294,45 @@ const FuelPage = () => {
         }
     };
 
-    const fetchVehicles = async () => {
+    const fetchVehicles = async (overrideDate = null) => {
         if (!selectedCompany?._id) return;
         try {
             const userInfoStr = localStorage.getItem('userInfo');
             const userInfo = userInfoStr ? JSON.parse(userInfoStr) : null;
             if (!userInfo?.token) return;
 
-            const { data } = await axios.get(`/api/admin/vehicles/${selectedCompany._id}?usePagination=false&type=fleet`, {
+            const targetDate = overrideDate || toDate;
+            const { data } = await axios.get(`/api/admin/vehicles/${selectedCompany._id}?usePagination=false&type=fleet&toDate=${targetDate}`, {
                 headers: { Authorization: `Bearer ${userInfo.token}` }
             });
             setVehicles(data.vehicles || []);
         } catch (err) { console.error(err); }
     };
 
-    const fetchDrivers = async () => {
+    const fetchDrivers = async (overrideDate = null, vehicleId = null) => {
         if (!selectedCompany?._id) return;
         try {
             const userInfoStr = localStorage.getItem('userInfo');
             const userInfo = userInfoStr ? JSON.parse(userInfoStr) : null;
             if (!userInfo?.token) return;
 
-            const { data } = await axios.get(`/api/admin/drivers/${selectedCompany._id}?usePagination=false`, {
+            const targetDate = overrideDate || toDate;
+            const isToday = targetDate === new Date().toLocaleDateString('en-CA');
+            const exactDateParam = !isToday ? '&exactDate=true' : '';
+            const vehicleParam = vehicleId ? `&exactVehicleId=${vehicleId}` : '';
+            const { data } = await axios.get(`/api/admin/drivers/${selectedCompany._id}?usePagination=false&driverType=All&toDate=${targetDate}${exactDateParam}${vehicleParam}`, {
                 headers: { Authorization: `Bearer ${userInfo.token}` }
             });
             setDrivers(data.drivers || []);
         } catch (err) { console.error(err); }
     };
+
+    useEffect(() => {
+        if (showModal && formData.date) {
+            fetchDrivers(formData.date, formData.vehicleId);
+            fetchVehicles(formData.date);
+        }
+    }, [formData.date, formData.vehicleId, showModal]);
 
     const handleCreate = async (e) => {
         e.preventDefault();
@@ -327,7 +383,6 @@ const FuelPage = () => {
             stationName: '',
             paymentMode: 'Cash',
             paymentSource: 'Office',
-            paymentBy: '',
             driver: '',
             slipPhoto: ''
         });
@@ -436,6 +491,7 @@ const FuelPage = () => {
     };
 
     const handleApproveReject = async (attendanceId, expenseId, status, extraData = {}) => {
+        setSubmitting(true);
         try {
             const userInfoStr = localStorage.getItem('userInfo');
             const userInfo = userInfoStr ? JSON.parse(userInfoStr) : null;
@@ -453,6 +509,8 @@ const FuelPage = () => {
             console.error('Fuel approve/reject error:', err);
             const msg = err.response?.data?.message || err.message || 'Error processing request';
             alert(`Error: ${msg}`);
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -471,9 +529,9 @@ const FuelPage = () => {
             'Odometer (KM)': e.odometer,
             'Distance (KM)': e.distance || 0,
             'Mileage (KM/L)': e.mileage || 0,
+            'Payment Mode': e.paymentMode || 'Cash',
             'Payment Source': e.paymentSource || 'Office',
-            'Payment By': e.paymentBy || 'N/A',
-            'Payment Mode': e.paymentMode,
+            'Payer / Guest': e.paymentBy || '-',
             'Station': e.stationName || 'N/A',
             'Driver': e.driver || 'N/A',
             'Source': e.source || 'Admin'
@@ -495,13 +553,18 @@ const FuelPage = () => {
         }
     }, [formData.amount, formData.quantity]);
 
+    const uniquePayers = [...new Set(entries.map(e => e.paymentBy).filter(name => name && name.trim() !== ''))].sort();
+
     const filteredEntries = entries.filter(e => {
         const matchesSearch = (e.vehicle?.carNumber?.toLowerCase()?.includes(searchTerm.toLowerCase()) ||
             e.stationName?.toLowerCase()?.includes(searchTerm.toLowerCase()) ||
             e.driver?.toLowerCase()?.includes(searchTerm.toLowerCase()) ||
             e.paymentBy?.toLowerCase()?.includes(searchTerm.toLowerCase()));
         const matchesVehicle = filterVehicle === 'All' || e.vehicle?._id === filterVehicle;
-        return matchesSearch && matchesVehicle;
+        const matchesPaymentSource = filterPaymentSource === 'All' || 
+            (e.paymentSource && e.paymentSource.toLowerCase() === filterPaymentSource.toLowerCase()) ||
+            (e.paymentBy && e.paymentBy.toLowerCase() === filterPaymentSource.toLowerCase());
+        return matchesSearch && matchesVehicle && matchesPaymentSource;
     }).sort((a, b) => {
         const dateA = new Date(a.date).getTime();
         const dateB = new Date(b.date).getTime();
@@ -518,6 +581,11 @@ const FuelPage = () => {
 
     const petrolAmount = filteredEntries.filter(e => e.fuelType === 'Petrol').reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
     const dieselAmount = filteredEntries.filter(e => e.fuelType === 'Diesel').reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+    const pageSize = 50;
+    useEffect(() => { setPage(1); }, [filteredEntries.length, filterVehicle, filterPaymentSource]);
+    const totalPages = Math.ceil(filteredEntries.length / pageSize);
+    const paginatedEntries = filteredEntries.slice((page - 1) * pageSize, page * pageSize);
 
     return (
         <div className="container-fluid" style={{ paddingBottom: '40px' }}>
@@ -546,17 +614,138 @@ const FuelPage = () => {
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                     {/* SEARCH & FILTERS MOVED TO HEADER */}
                     <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(15, 23, 42, 0.6)', padding: '10 15px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)', height: '36px', position: 'relative' }}>
-                            <Car size={13} color="#f59e0b" style={{ opacity: 0.8 }} />
-                            <select
-                                value={filterVehicle}
-                                onChange={(e) => setFilterVehicle(e.target.value)}
-                                style={{ background: 'transparent', border: 'none', color: 'white', fontWeight: '800', fontSize: '11px', outline: 'none', cursor: 'pointer', height: '100%', width: '100px', textTransform: 'uppercase', appearance: 'none', paddingRight: '20px' }}
+                        {/* CUSTOM VEHICLE FILTER */}
+                        <div ref={dropdownRef} style={{ position: 'relative', zIndex: 50 }}>
+                            <div 
+                                onClick={() => setShowVehicleDropdown(!showVehicleDropdown)}
+                                style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(15, 23, 42, 0.6)', padding: '0 15px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)', height: '36px', cursor: 'pointer', minWidth: '180px' }}
                             >
-                                <option value="All" style={{ background: '#0f172a' }}>All Vehicles</option>
-                                {vehicles.map(v => <option key={v._id} value={v._id} style={{ background: '#0f172a' }}>{v.carNumber}</option>)}
-                            </select>
-                            <ChevronDown size={14} color="rgba(255,255,255,0.4)" style={{ position: 'absolute', right: '10px', pointerEvents: 'none' }} />
+                                <Car size={13} color="#f59e0b" style={{ opacity: 0.8 }} />
+                                <span style={{ color: 'white', fontWeight: '800', fontSize: '11px', textTransform: 'uppercase', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {filterVehicle === 'All' ? 'All Vehicles' : (vehicles.find(v => v._id === filterVehicle)?.carNumber || 'Unknown Vehicle')}
+                                </span>
+                                <ChevronDown size={14} color="rgba(255,255,255,0.4)" style={{ transition: 'transform 0.2s', transform: showVehicleDropdown ? 'rotate(180deg)' : 'rotate(0)' }} />
+                            </div>
+
+                            {/* DROPDOWN PANEL */}
+                            <AnimatePresence>
+                                {showVehicleDropdown && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 15, scale: 0.95 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: 15, scale: 0.95 }}
+                                        transition={{ duration: 0.2, ease: "easeOut" }}
+                                        style={{ position: 'absolute', top: '100%', left: 0, marginTop: '12px', width: '340px', background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98))', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '20px', padding: '16px', boxShadow: '0 25px 50px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: '12px' }}
+                                    >
+                                        <div style={{ position: 'relative' }}>
+                                            <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.5)' }} />
+                                            <input 
+                                                type="text" 
+                                                placeholder="Search car number or model..." 
+                                                value={vehicleSearchQuery}
+                                                onChange={(e) => {
+                                                    setVehicleSearchQuery(e.target.value);
+                                                    if(e.target.value) setExpandedModel(null);
+                                                }}
+                                                style={{ width: '100%', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '12px 12px 12px 40px', color: 'white', fontSize: '13px', outline: 'none', transition: 'border-color 0.2s', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)' }}
+                                                onFocus={(e) => e.target.style.border = '1px solid rgba(245, 158, 11, 0.5)'}
+                                                onBlur={(e) => e.target.style.border = '1px solid rgba(255,255,255,0.1)'}
+                                            />
+                                        </div>
+
+                                        <div style={{ maxHeight: '380px', overflowY: 'auto', paddingRight: '6px' }} className="premium-scroll">
+                                            <div 
+                                                onClick={() => { setFilterVehicle('All'); setShowVehicleDropdown(false); setExpandedModel(null); setVehicleSearchQuery(''); }}
+                                                style={{ padding: '12px 16px', borderRadius: '12px', background: filterVehicle === 'All' ? 'linear-gradient(90deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.05))' : 'rgba(255,255,255,0.02)', border: filterVehicle === 'All' ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid transparent', color: filterVehicle === 'All' ? '#f59e0b' : 'white', fontSize: '14px', fontWeight: '800', cursor: 'pointer', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.2s' }}
+                                                onMouseEnter={(e) => { if(filterVehicle !== 'All') e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+                                                onMouseLeave={(e) => { if(filterVehicle !== 'All') e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
+                                            >
+                                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: filterVehicle === 'All' ? '#f59e0b' : 'rgba(255,255,255,0.2)', transition: 'all 0.2s', boxShadow: filterVehicle === 'All' ? '0 0 10px rgba(245,158,11,0.5)' : 'none' }} />
+                                                All Vehicles
+                                            </div>
+
+                                            {(() => {
+                                                const fuelCountsPerCar = entries.reduce((acc, e) => {
+                                                    if (e.vehicle?._id) acc[e.vehicle._id] = (acc[e.vehicle._id] || 0) + 1;
+                                                    return acc;
+                                                }, {});
+
+                                                let filteredVehicles = vehicles;
+                                                if (vehicleSearchQuery) {
+                                                    const sq = vehicleSearchQuery.toLowerCase();
+                                                    filteredVehicles = vehicles.filter(v => 
+                                                        (v.carNumber || '').toLowerCase().includes(sq) || 
+                                                        (v.model || '').toLowerCase().includes(sq)
+                                                    );
+                                                }
+
+                                                const grouped = filteredVehicles.reduce((acc, v) => {
+                                                    const mod = v.model || 'Unknown Model';
+                                                    if (!acc[mod]) acc[mod] = [];
+                                                    acc[mod].push(v);
+                                                    return acc;
+                                                }, {});
+
+                                                return Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([modelName, cars]) => {
+                                                    const isExpanded = expandedModel === modelName || vehicleSearchQuery.length > 0;
+                                                    return (
+                                                        <div key={modelName} style={{ marginBottom: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', overflow: 'hidden', transition: 'all 0.2s' }}>
+                                                            <div 
+                                                                onClick={() => setExpandedModel(isExpanded ? null : modelName)}
+                                                                style={{ padding: '12px 16px', background: isExpanded ? 'rgba(255,255,255,0.05)' : 'transparent', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: 'background 0.2s' }}
+                                                                onMouseEnter={(e) => { if(!isExpanded) e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }}
+                                                                onMouseLeave={(e) => { if(!isExpanded) e.currentTarget.style.background = 'transparent' }}
+                                                            >
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                                    <div style={{ background: 'rgba(255,255,255,0.1)', padding: '6px', borderRadius: '8px' }}>
+                                                                        <Car size={14} color="rgba(255,255,255,0.8)" />
+                                                                    </div>
+                                                                    <span style={{ color: 'white', fontWeight: '800', fontSize: '13px', letterSpacing: '0.5px' }}>{modelName}</span>
+                                                                </div>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                                    <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: '900', background: 'rgba(0,0,0,0.5)', padding: '4px 8px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)' }}>{cars.length} Cars</span>
+                                                                    <ChevronDown size={14} color="rgba(255,255,255,0.5)" style={{ transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0)' }} />
+                                                                </div>
+                                                            </div>
+                                                            <AnimatePresence>
+                                                                {isExpanded && (
+                                                                    <motion.div
+                                                                        initial={{ height: 0, opacity: 0 }}
+                                                                        animate={{ height: 'auto', opacity: 1 }}
+                                                                        exit={{ height: 0, opacity: 0 }}
+                                                                        transition={{ duration: 0.2 }}
+                                                                        style={{ overflow: 'hidden' }}
+                                                                    >
+                                                                        <div style={{ padding: '8px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                                                            {cars.map(v => {
+                                                                                const count = fuelCountsPerCar[v._id] || 0;
+                                                                                const isSelected = filterVehicle === v._id;
+                                                                                return (
+                                                                                    <div 
+                                                                                        key={v._id}
+                                                                                        onClick={() => { setFilterVehicle(v._id); setShowVehicleDropdown(false); }}
+                                                                                        style={{ padding: '10px 14px 10px 36px', borderRadius: '8px', background: isSelected ? 'rgba(245, 158, 11, 0.15)' : 'transparent', color: isSelected ? '#f59e0b' : 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: '700', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.2s', position: 'relative' }}
+                                                                                        onMouseEnter={(e) => { if(!isSelected) { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = 'white'; } }}
+                                                                                        onMouseLeave={(e) => { if(!isSelected) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.7)'; } }}
+                                                                                    >
+                                                                                        {isSelected && <div style={{ position: 'absolute', left: '12px', width: '4px', height: '4px', borderRadius: '50%', background: '#f59e0b', boxShadow: '0 0 8px #f59e0b' }} />}
+                                                                                        <span>{v.carNumber}</span>
+                                                                                        {count > 0 && <span style={{ fontSize: '10px', background: isSelected ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255,255,255,0.1)', color: isSelected ? '#f59e0b' : 'rgba(255,255,255,0.5)', padding: '2px 8px', borderRadius: '12px', fontWeight: '800' }}>{count} logs</span>}
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    </motion.div>
+                                                                )}
+                                                            </AnimatePresence>
+                                                        </div>
+                                                    );
+                                                });
+                                            })()}
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
                         <div style={{ position: 'relative', width: '220px' }}>
                             <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.3)' }} />
@@ -748,13 +937,113 @@ const FuelPage = () => {
                                     <th style={{ padding: '20px 25px', color: 'var(--text-muted)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase' }}>Fuel Details</th>
                                     <th style={{ padding: '20px 25px', color: 'var(--text-muted)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase' }}>Odometer & Trip</th>
                                     <th style={{ padding: '20px 25px', color: 'var(--text-muted)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase' }}>Efficiency</th>
-                                    <th style={{ padding: '20px 25px', color: 'var(--text-muted)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase' }}>Payment Source</th>
+                                    <th style={{ padding: '20px 25px', color: 'var(--text-muted)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            PAYMENT SOURCE
+                                            <div style={{ position: 'relative' }} ref={paymentFilterRef}>
+                                                <div 
+                                                    onClick={() => setShowPaymentFilter(!showPaymentFilter)}
+                                                    style={{
+                                                        background: showPaymentFilter ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)',
+                                                        border: '1px solid rgba(255,255,255,0.1)',
+                                                        borderRadius: '6px',
+                                                        padding: '4px 24px 4px 10px',
+                                                        color: 'white',
+                                                        fontSize: '10px',
+                                                        fontWeight: '800',
+                                                        textTransform: 'uppercase',
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        transition: 'all 0.2s'
+                                                    }}
+                                                >
+                                                    {filterPaymentSource === 'All' ? 'ALL' : filterPaymentSource}
+                                                    <ChevronDown size={12} style={{ position: 'absolute', right: '8px', top: '50%', transform: `translateY(-50%) ${showPaymentFilter ? 'rotate(180deg)' : 'rotate(0deg)'}`, color: 'rgba(255,255,255,0.6)', transition: 'transform 0.2s' }} />
+                                                </div>
+                                                
+                                                <AnimatePresence>
+                                                    {showPaymentFilter && (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, y: 5, scale: 0.95 }}
+                                                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                            exit={{ opacity: 0, y: 5, scale: 0.95 }}
+                                                            transition={{ duration: 0.15 }}
+                                                            style={{
+                                                                position: 'absolute',
+                                                                top: '100%',
+                                                                left: 0,
+                                                                marginTop: '8px',
+                                                                width: '180px',
+                                                                background: '#0f172a',
+                                                                border: '1px solid rgba(255,255,255,0.1)',
+                                                                borderRadius: '8px',
+                                                                padding: '6px',
+                                                                boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                                                                zIndex: 100,
+                                                                display: 'flex',
+                                                                flexDirection: 'column',
+                                                                gap: '4px',
+                                                                maxHeight: '250px'
+                                                            }}
+                                                        >
+                                                            <div style={{ padding: '4px', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: '4px' }}>
+                                                                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                                                    <Search size={12} color="rgba(255,255,255,0.4)" style={{ position: 'absolute', left: '8px' }} />
+                                                                    <input 
+                                                                        type="text" 
+                                                                        placeholder="Search..." 
+                                                                        value={payerSearch}
+                                                                        onChange={(e) => setPayerSearch(e.target.value)}
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                        style={{ 
+                                                                            width: '100%', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '4px', 
+                                                                            padding: '6px 8px 6px 24px', color: 'white', fontSize: '11px', outline: 'none' 
+                                                                        }} 
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                            <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', paddingRight: '2px' }} className="custom-scrollbar">
+                                                                {['All', 'Office', 'Guest', ...uniquePayers]
+                                                                    .filter(opt => opt.toLowerCase().includes(payerSearch.toLowerCase()))
+                                                                    .map(option => (
+                                                                    <div
+                                                                        key={option}
+                                                                        onClick={() => { setFilterPaymentSource(option); setShowPaymentFilter(false); setPayerSearch(''); }}
+                                                                        style={{
+                                                                            padding: '8px 12px',
+                                                                            borderRadius: '6px',
+                                                                            background: filterPaymentSource === option ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+                                                                            color: filterPaymentSource === option ? '#3b82f6' : 'rgba(255,255,255,0.7)',
+                                                                            fontSize: '11px',
+                                                                            fontWeight: '800',
+                                                                            textTransform: 'uppercase',
+                                                                            cursor: 'pointer',
+                                                                            transition: 'all 0.2s',
+                                                                            whiteSpace: 'nowrap',
+                                                                            overflow: 'hidden',
+                                                                            textOverflow: 'ellipsis'
+                                                                        }}
+                                                                        onMouseEnter={(e) => { if(filterPaymentSource !== option) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+                                                                        onMouseLeave={(e) => { if(filterPaymentSource !== option) e.currentTarget.style.background = 'transparent' }}
+                                                                        title={option}
+                                                                    >
+                                                                        {option}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </div>
+                                        </div>
+                                    </th>
                                     <th style={{ padding: '20px 25px', color: 'var(--text-muted)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase' }}>Total Amount</th>
                                     <th style={{ padding: '20px 25px', color: 'var(--text-muted)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', textAlign: 'right' }}>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredEntries.map((e, idx) => (
+                                {paginatedEntries.map((e, idx) => (
                                     <motion.tr
                                         key={e._id}
                                         initial={{ opacity: 0, x: -10 }}
@@ -773,11 +1062,11 @@ const FuelPage = () => {
                                         </td>
                                         <td style={{ padding: '15px 25px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '6px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', fontWeight: '900', textTransform: 'uppercase', border: '1px solid rgba(245,158,11,0.1)' }}>{e.fuelType}</span>
-                                                <span style={{ fontSize: '15px', color: 'white', fontWeight: '810' }}>{e.quantity} <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>LITERS</span></span>
+                                                <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '6px', background: e.fuelType === 'Electric' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)', color: e.fuelType === 'Electric' ? '#10b981' : '#f59e0b', fontWeight: '900', textTransform: 'uppercase', border: `1px solid ${e.fuelType === 'Electric' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)'}` }}>{e.fuelType}</span>
+                                                <span style={{ fontSize: '15px', color: 'white', fontWeight: '810' }}>{e.quantity} <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>{e.fuelType === 'Electric' ? 'UNITS' : 'LITERS'}</span></span>
                                             </div>
                                             <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '11px', marginTop: '5px', fontWeight: '700' }}>
-                                                @ ₹{e.rate}/L • {e.stationName || 'Local Station'}
+                                                @ ₹{e.rate}/{e.fuelType === 'Electric' ? 'kWh' : 'L'} • {e.stationName || 'Local Station'}
                                             </div>
                                         </td>
                                         <td style={{ padding: '15px 25px' }}>
@@ -803,12 +1092,11 @@ const FuelPage = () => {
                                                 ₹{e.costPerKm || 0}/KM COST
                                             </div>
                                         </td>
-                                        <td style={{ padding: '15px 25px' }}>
-                                            <div style={{
-                                                color: 'white', fontWeight: '900', fontSize: '12px', padding: '4px 12px', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', background: 'rgba(255,255,255,0.02)', display: 'inline-block', textTransform: 'uppercase'
-                                            }}>
+                                        <td style={{ padding: '15px 20px', color: 'rgba(255,255,255,0.7)', fontSize: '14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: e.paymentSource?.toLowerCase().includes('guest') ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)', color: e.paymentSource?.toLowerCase().includes('guest') ? '#3b82f6' : '#10b981', padding: '4px 10px', borderRadius: '8px', fontSize: '12px', fontWeight: '700' }}>
                                                 {e.paymentSource?.toLowerCase().includes('guest') ? 'Guest' : 'Office'}
-                                            </div>
+                                            </span>
+                                            {e.paymentBy && <div style={{ fontSize: '12px', marginTop: '4px', color: 'rgba(255,255,255,0.5)' }}>{e.paymentBy}</div>}
                                         </td>
                                         <td style={{ padding: '15px 25px' }}>
                                             <div style={{ color: 'white', fontWeight: '950', fontSize: '18px' }}>₹{e.amount.toLocaleString()}</div>
@@ -880,7 +1168,7 @@ const FuelPage = () => {
                     </div>
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                        {filteredEntries.map((e) => (
+                        {paginatedEntries.map((e) => (
                             <motion.div
                                 key={e._id}
                                 initial={{ opacity: 0, y: 10 }}
@@ -897,7 +1185,7 @@ const FuelPage = () => {
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
                                         <div style={{ color: 'var(--primary)', fontWeight: '900', fontSize: '18px' }}>₹{e.amount.toLocaleString()}</div>
-                                        <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{e.quantity} L @ ₹{e.rate}/Volume</div>
+                                        <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{e.quantity} {e.fuelType === 'Electric' ? 'Units' : 'L'} @ ₹{e.rate}/{e.fuelType === 'Electric' ? 'kWh' : 'Volume'}</div>
                                         {e.createdBy?.name && (
                                             <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginTop: '4px', fontWeight: '800' }}>
                                                 Approved By: {e.createdBy.name}
@@ -919,7 +1207,7 @@ const FuelPage = () => {
 
                                 <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '4px', background: e.fuelType === 'Diesel' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(14, 165, 233, 0.1)', color: e.fuelType === 'Diesel' ? 'var(--primary)' : 'var(--primary)', fontWeight: '800', textTransform: 'uppercase' }}>{e.fuelType}</span>
+                                        <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '4px', background: e.fuelType === 'Electric' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)', color: e.fuelType === 'Electric' ? '#10b981' : (e.fuelType === 'Diesel' ? 'var(--primary)' : 'var(--primary)'), fontWeight: '800', textTransform: 'uppercase' }}>{e.fuelType}</span>
                                         <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>• {e.stationName || 'Local Station'}</span>
                                     </div>
                                 </div>
@@ -955,6 +1243,26 @@ const FuelPage = () => {
                 )}
             </div>
 
+            {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', padding: '20px 0' }}>
+                    <button 
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                        disabled={page === 1}
+                        style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.05)', color: page === 1 ? 'rgba(255,255,255,0.2)' : 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', cursor: page === 1 ? 'not-allowed' : 'pointer', fontWeight: '800' }}
+                    >
+                        Prev
+                    </button>
+                    <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '800' }}>Page {page} of {totalPages}</span>
+                    <button 
+                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                        disabled={page === totalPages}
+                        style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.05)', color: page === totalPages ? 'rgba(255,255,255,0.2)' : 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', cursor: page === totalPages ? 'not-allowed' : 'pointer', fontWeight: '800' }}
+                    >
+                        Next
+                    </button>
+                </div>
+            )}
+
             {/* Add Record Modal */}
             <AnimatePresence>
                 {showModal && (
@@ -981,21 +1289,22 @@ const FuelPage = () => {
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))', gap: '20px' }}>
                                         <div>
                                             <label style={{ color: 'var(--text-muted)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Vehicle Number *</label>
-                                            <select
-                                                className="input-field"
+                                            <SearchableSelect
+                                                options={vehicles.map(v => ({ value: v._id, label: `${v.carNumber} (${v.model})` }))}
                                                 value={formData.vehicleId}
-                                                required
-                                                onChange={(e) => setFormData({ ...formData, vehicleId: e.target.value })}
-                                                style={{ width: '100%', height: '50px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', color: 'white', padding: '0 15px' }}
-                                            >
-                                                <option value="" style={{ background: '#0f172a' }}>-- Select Car --</option>
-                                                {vehicles.map(v => <option key={v._id} value={v._id} style={{ background: '#0f172a' }}>{v.carNumber} ({v.model})</option>)}
-                                            </select>
+                                                onChange={(vid) => {
+                                                    const selectedVehicle = vehicles.find(v => v._id === vid);
+                                                    const autoDriver = selectedVehicle?.currentDriver?.name || '';
+                                                    setFormData({ ...formData, vehicleId: vid, driver: autoDriver });
+                                                }}
+                                                placeholder="Search Vehicle..."
+                                                required={true}
+                                            />
                                         </div>
                                         <div>
                                             <label style={{ color: 'var(--text-muted)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Fuel Type</label>
                                             <div style={{ display: 'flex', gap: '8px', background: 'rgba(255,255,255,0.02)', padding: '5px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.05)', height: '50px' }}>
-                                                {['Diesel', 'Petrol', 'CNG'].map(t => (
+                                                {['Diesel', 'Petrol', 'CNG', 'Electric'].map(t => (
                                                     <button
                                                         key={t} type="button"
                                                         onClick={() => setFormData({ ...formData, fuelType: t })}
@@ -1004,7 +1313,7 @@ const FuelPage = () => {
                                                             height: '100%',
                                                             borderRadius: '10px',
                                                             border: 'none',
-                                                            background: formData.fuelType === t ? (t === 'Diesel' ? 'var(--primary)' : 'var(--primary)') : 'transparent',
+                                                            background: formData.fuelType === t ? (t === 'Electric' ? '#10b981' : 'var(--primary)') : 'transparent',
                                                             color: formData.fuelType === t ? 'black' : 'rgba(255,255,255,0.5)',
                                                             fontWeight: '800',
                                                             fontSize: '12px',
@@ -1034,7 +1343,7 @@ const FuelPage = () => {
                                             <input type="number" className="input-field" placeholder="e.g. 5000" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} required style={{ width: '100%', height: '50px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', color: 'white', padding: '0 15px' }} />
                                         </div>
                                         <div>
-                                            <label style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Volume (L) *</label>
+                                            <label style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>{formData.fuelType === 'Electric' ? 'Units (kWh) *' : 'Volume (L) *'}</label>
                                             <input type="number" step="0.01" className="input-field" placeholder="e.g. 50" value={formData.quantity} onChange={(e) => setFormData({ ...formData, quantity: e.target.value })} required style={{ width: '100%', height: '50px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', color: 'white', padding: '0 15px' }} />
                                         </div>
                                     </div>
@@ -1051,11 +1360,43 @@ const FuelPage = () => {
                                         </div>
                                         <div>
                                             <label style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Payment Source</label>
-                                            <select className="input-field" value={formData.paymentSource} onChange={(e) => setFormData({ ...formData, paymentSource: e.target.value })} style={{ width: '100%', height: '50px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', color: 'white', padding: '0 15px' }}>
-                                                <option value="Office" style={{ background: '#0f172a' }}>Office</option>
-                                                <option value="Guest" style={{ background: '#0f172a' }}>Guest</option>
+                                            <select className="input-field" value={formData.paymentSource} onChange={(e) => setFormData({ ...formData, paymentSource: e.target.value, paymentBy: '', client: '', drsDuty: '' })} style={{ width: '100%', height: '50px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', color: 'white', padding: '0 15px' }}>
+                                                <option value="Office">Office</option>
+                                                <option value="Guest">Guest / Client</option>
                                             </select>
                                         </div>
+                                        
+                                        {formData.paymentSource?.toLowerCase().includes('guest') ? (
+                                            <div>
+                                                <label style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Guest Name</label>
+                                                <input
+                                                    type="text"
+                                                    className="input-field"
+                                                    value={formData.paymentBy}
+                                                    onChange={(e) => setFormData({ ...formData, paymentBy: e.target.value, client: '', drsDuty: '' })}
+                                                    placeholder="e.g. Rahul Sharma"
+                                                    style={{ width: '100%', height: '50px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', color: 'white', padding: '0 15px' }}
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <label style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Office Payer Name</label>
+                                                <input
+                                                    type="text"
+                                                    className="input-field"
+                                                    value={formData.paymentBy}
+                                                    onChange={(e) => setFormData({ ...formData, paymentBy: e.target.value })}
+                                                    placeholder="e.g. Admin Manager"
+                                                    list="payer-names"
+                                                    style={{ width: '100%', height: '50px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', color: 'white', padding: '0 15px' }}
+                                                />
+                                                <datalist id="payer-names">
+                                                    {uniquePayers.map((name, idx) => (
+                                                        <option key={idx} value={name} />
+                                                    ))}
+                                                </datalist>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Vendor and Personnel */}
@@ -1228,13 +1569,13 @@ const FuelPage = () => {
                                         <input type="number" className="input-field" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} style={{ background: 'rgba(255,255,255,0.05)' }} />
                                     </div>
                                     <div>
-                                        <label style={{ color: 'white', fontSize: '12px', marginBottom: '8px', display: 'block' }}>Volume (L)</label>
+                                        <label style={{ color: 'white', fontSize: '12px', marginBottom: '8px', display: 'block' }}>{formData.fuelType === 'Electric' ? 'Units (kWh)' : 'Volume (L)'}</label>
                                         <input type="number" step="0.01" className="input-field" value={formData.quantity} onChange={(e) => setFormData({ ...formData, quantity: e.target.value })} />
                                     </div>
                                 </div>
                                 <div className="form-grid-2" style={{ marginTop: '15px' }}>
                                     <div>
-                                        <label style={{ color: 'white', fontSize: '12px', marginBottom: '8px', display: 'block' }}>Rate (₹/Volume)</label>
+                                        <label style={{ color: 'white', fontSize: '12px', marginBottom: '8px', display: 'block' }}>{formData.fuelType === 'Electric' ? 'Rate (₹/kWh)' : 'Rate (₹/Volume)'}</label>
                                         <input type="number" step="0.01" className="input-field" value={formData.rate} onChange={(e) => setFormData({ ...formData, rate: e.target.value })} />
                                     </div>
                                     <div>
@@ -1243,17 +1584,51 @@ const FuelPage = () => {
                                     </div>
                                 </div>
 
-                                <div style={{ marginTop: '15px' }}>
-                                    <label style={{ color: 'white', fontSize: '12px', marginBottom: '8px', display: 'block' }}>Payment Source</label>
-                                    <select
-                                        className="input-field"
-                                        value={formData.paymentSource}
-                                        onChange={(e) => setFormData({ ...formData, paymentSource: e.target.value })}
-                                        style={{ width: '100%', background: 'rgba(255,255,255,0.05)' }}
-                                    >
-                                        <option value="Office">Office</option>
-                                        <option value="Guest">Guest</option>
-                                    </select>
+                                <div style={{ marginTop: '15px', display: 'flex', gap: '15px' }}>
+                                    <div style={{ flex: 1 }}>
+                                        <label style={{ color: 'white', fontSize: '12px', marginBottom: '8px', display: 'block' }}>Payment Source</label>
+                                        <select
+                                            className="input-field"
+                                            value={formData.paymentSource}
+                                            onChange={(e) => setFormData({ ...formData, paymentSource: e.target.value })}
+                                            style={{ width: '100%', height: '50px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', color: 'white', padding: '0 15px' }}
+                                        >
+                                            <option value="Office">Office</option>
+                                            <option value="Guest">Guest / Client</option>
+                                        </select>
+                                    </div>
+
+                                    {formData.paymentSource?.toLowerCase().includes('guest') ? (
+                                        <div style={{ flex: 1 }}>
+                                            <label style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Guest Name</label>
+                                            <input
+                                                type="text"
+                                                className="input-field"
+                                                value={formData.paymentBy}
+                                                onChange={(e) => setFormData({ ...formData, paymentBy: e.target.value, client: '', drsDuty: '' })}
+                                                placeholder="e.g. Rahul Sharma"
+                                                style={{ width: '100%', height: '50px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', color: 'white', padding: '0 15px' }}
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div style={{ flex: 1 }}>
+                                            <label style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Office Payer Name</label>
+                                            <input
+                                                type="text"
+                                                className="input-field"
+                                                value={formData.paymentBy}
+                                                onChange={(e) => setFormData({ ...formData, paymentBy: e.target.value })}
+                                                placeholder="e.g. Admin Manager"
+                                                list="payer-names"
+                                                style={{ width: '100%', height: '50px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', color: 'white', padding: '0 15px' }}
+                                            />
+                                            <datalist id="payer-names">
+                                                {uniquePayers.map((name, idx) => (
+                                                    <option key={idx} value={name} />
+                                                ))}
+                                            </datalist>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div style={{ padding: '20px', background: 'rgba(255,255,255,0.02)', borderRadius: '16px', border: '1px dashed rgba(255,255,255,0.1)', marginTop: '20px' }}>
@@ -1295,14 +1670,16 @@ const FuelPage = () => {
 
                                 <div style={{ display: 'flex', gap: '15px', marginTop: '25px' }}>
                                     <button
-                                        onClick={() => handleApproveReject(selectedPending.attendanceId, selectedPending._id, 'approved', { amount: formData.amount, quantity: formData.quantity, rate: formData.rate, odometer: formData.odometer, slipPhoto: formData.slipPhoto, paymentSource: formData.paymentSource, paymentBy: formData.paymentBy })}
-                                        style={{ flex: 2, height: '50px', borderRadius: '12px', fontSize: '15px', fontWeight: '800', background: '#10b981', color: 'white', border: 'none', cursor: 'pointer' }}
+                                        onClick={() => handleApproveReject(selectedPending.attendanceId, selectedPending._id, 'approved', { amount: formData.amount, quantity: formData.quantity, rate: formData.rate, odometer: formData.odometer, slipPhoto: formData.slipPhoto, paymentSource: formData.paymentSource, paymentBy: formData.paymentBy, client: formData.client, drsDuty: formData.drsDuty })}
+                                        disabled={submitting}
+                                        style={{ flex: 2, height: '50px', borderRadius: '12px', fontSize: '15px', fontWeight: '800', background: submitting ? 'rgba(16, 185, 129, 0.5)' : '#10b981', color: 'white', border: 'none', cursor: submitting ? 'not-allowed' : 'pointer' }}
                                     >
-                                        Confirm Approval
+                                        {submitting ? 'Processing...' : 'Confirm Approval'}
                                     </button>
                                     <button
                                         onClick={() => handleApproveReject(selectedPending.attendanceId, selectedPending._id, 'rejected')}
-                                        style={{ flex: 1, background: 'rgba(244, 63, 94, 0.1)', color: '#f43f5e', border: '1px solid rgba(244, 63, 94, 0.2)', borderRadius: '12px', fontWeight: '800', cursor: 'pointer' }}
+                                        disabled={submitting}
+                                        style={{ flex: 1, background: 'rgba(244, 63, 94, 0.1)', color: '#f43f5e', border: '1px solid rgba(244, 63, 94, 0.2)', borderRadius: '12px', fontWeight: '800', cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.5 : 1 }}
                                     >
                                         Reject
                                     </button>

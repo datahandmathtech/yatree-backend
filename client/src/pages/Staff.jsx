@@ -120,7 +120,7 @@ const Staff = () => {
     const [filterStaff, setFilterStaff] = useState('all');
 
     const [formData, setFormData] = useState({
-        name: '', mobile: '', username: '', password: '', confirmPassword: '', oldPassword: '', salary: 0, monthlyLeaveAllowance: 0,
+        name: '', mobile: '', username: '', password: '', confirmPassword: '', oldPassword: '', salary: 0, monthlyLeaveAllowance: 0, leaveDeductionRate: 0,
         email: '', designation: '', shiftTiming: { start: '09:00', end: '18:00' },
         officeLocation: { latitude: '', longitude: '', address: '', radius: 200 },
         joiningDate: '',
@@ -399,7 +399,7 @@ const Staff = () => {
             setToDate(todayIST());
             setBackdateForm({ staffId: '', date: todayIST(), status: 'present', punchInTime: '', punchOutTime: '' });
             setFormData({
-                name: '', mobile: '', username: '', password: '', oldPassword: '', salary: 0, monthlyLeaveAllowance: 0,
+                name: '', mobile: '', username: '', password: '', oldPassword: '', salary: 0, monthlyLeaveAllowance: 0, leaveDeductionRate: 0,
                 email: '', designation: '', shiftTiming: { start: '09:00', end: '18:00' },
                 officeLocation: { latitude: '', longitude: '', address: '', radius: 200 },
                 joiningDate: todayIST(),
@@ -674,6 +674,10 @@ const Staff = () => {
         const summaryRows = [
             ['Total Days in Period', `${staff.totalDaysInCycle || 30} Days`],
             ['Actual Days Present', `${staff.presentDays || 0} Days`],
+            ['Previous Month Leave C/F', `${staff.previousMonthCarryForward || 0} Days`],
+            ['Allowed Month Leave', `${staff.allowedMonthLeave || 0} Days`],
+            ['Total Leave Available', `${staff.totalLeaveAvailable || 0} Days`],
+            ['Leave Utilized for this month', `${staff.leavesTakenThisMonth || 0} Days`],
             ['Sundays (Paid Holidays)', `${staff.sundaysPassed || 0} Days`],
             ['Sundays Worked (Extra Bonus)', `${staff.sundaysWorked || 0} Days`],
             ['Total Absences', `${staff.leavesTaken || 0} Days`],
@@ -813,7 +817,7 @@ const Staff = () => {
             fetchStaff();
             const defaultOffice = staffList.find(s => s.officeLocation?.latitude)?.officeLocation || { latitude: '', longitude: '', address: '', radius: 200 };
             setFormData({
-                name: '', mobile: '', username: '', password: '', oldPassword: '', salary: 0, monthlyLeaveAllowance: 0,
+                name: '', mobile: '', username: '', password: '', oldPassword: '', salary: 0, monthlyLeaveAllowance: 0, leaveDeductionRate: 0,
                 email: '', designation: '', shiftTiming: { start: '09:00', end: '18:00' },
                 officeLocation: defaultOffice,
                 joiningDate: todayIST(),
@@ -832,6 +836,7 @@ const Staff = () => {
             password: '',
             salary: staff.salary || 0,
             monthlyLeaveAllowance: (staff.monthlyLeaveAllowance !== undefined && staff.monthlyLeaveAllowance !== null && staff.monthlyLeaveAllowance !== '') ? staff.monthlyLeaveAllowance : 4,
+            leaveDeductionRate: staff.leaveDeductionRate || 0,
             email: staff.email || '',
             designation: staff.designation || '',
             shiftTiming: staff.shiftTiming || { start: '09:00', end: '18:00' },
@@ -1146,7 +1151,7 @@ const Staff = () => {
                                 setIsEditing(false);
                                 const defaultOffice = staffList.find(s => s.officeLocation?.latitude)?.officeLocation || { latitude: '', longitude: '', address: '', radius: 200 };
                                 setFormData({
-                                    name: '', mobile: '', username: '', password: '', salary: 0, monthlyLeaveAllowance: 0,
+                                    name: '', mobile: '', username: '', password: '', salary: 0, monthlyLeaveAllowance: 0, leaveDeductionRate: 0,
                                     email: '', designation: '', shiftTiming: { start: '09:00', end: '18:00' },
                                     officeLocation: defaultOffice,
                                     joiningDate: todayIST(),
@@ -1662,7 +1667,29 @@ const Staff = () => {
                                                                         </div>
                                                                         {record.punchOut?.time
                                                                             ? formatTimeIST(record.punchOut.time)
-                                                                            : 'ACTIVE SHIFT'
+                                                                            : (
+                                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                                                    <span>ACTIVE SHIFT</span>
+                                                                                    {record.punchIn?.time && record.staff?._id && (
+                                                                                        <button
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation();
+                                                                                                setBackdateForm({
+                                                                                                    staffId: record.staff._id,
+                                                                                                    date: record.date,
+                                                                                                    status: record.status || 'present',
+                                                                                                    punchInTime: DateTime.fromISO(record.punchIn.time).setZone('Asia/Kolkata').toFormat('HH:mm'),
+                                                                                                    punchOutTime: ''
+                                                                                                });
+                                                                                                setShowBackdateModal(true);
+                                                                                            }}
+                                                                                            style={{ background: 'rgba(244, 63, 94, 0.2)', color: '#f43f5e', padding: '3px 10px', borderRadius: '6px', fontSize: '10px', border: '1px solid rgba(244, 63, 94, 0.4)', cursor: 'pointer', fontWeight: '900', letterSpacing: '0.5px' }}
+                                                                                        >
+                                                                                            MARK OUT
+                                                                                        </button>
+                                                                                    )}
+                                                                                </div>
+                                                                            )
                                                                         }
                                                                     </div>
                                                                 </div>
@@ -2087,17 +2114,14 @@ const Staff = () => {
                                                                     <div style={{ fontSize: '13px', fontWeight: '900', color: '#10b981' }}>{item.presentDays} <span style={{ opacity: 0.3, fontSize: '10px' }}>PRES</span></div>
                                                                     <div style={{ fontSize: '9px', fontWeight: '800', color: '#10b981', textTransform: 'uppercase' }}>Present</div>
                                                                 </div>
-                                                                {item.staffType !== 'Fixed' && item.staffType !== 'Daily' && (
+                                                                {item.cycleStart && item.cycleEnd && (
                                                                     <>
                                                                         <div style={{ width: '1px', height: '24px', background: 'rgba(255,255,255,0.1)' }}></div>
-                                                                        <div>
-                                                                            <div style={{ fontSize: '13px', fontWeight: '900', color: 'var(--primary)' }}>{item.paidLeavesUsed || 0} <span style={{ opacity: 0.3, fontSize: '10px' }}>PAID</span></div>
-                                                                            <div style={{ fontSize: '9px', fontWeight: '800', color: 'var(--primary)', textTransform: 'uppercase' }}>Leaves</div>
-                                                                        </div>
-                                                                        <div style={{ width: '1px', height: '24px', background: 'rgba(255,255,255,0.1)' }}></div>
-                                                                        <div>
-                                                                            <div style={{ fontSize: '13px', fontWeight: '900', color: '#fbbf24' }}>{item.availableLeavesPool || 0} <span style={{ opacity: 0.3, fontSize: '10px' }}>LEFT</span></div>
-                                                                            <div style={{ fontSize: '9px', fontWeight: '800', color: '#fbbf24', textTransform: 'uppercase' }}>Balance</div>
+                                                                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                                                            <div style={{ fontSize: '11px', fontWeight: '900', color: '#8b5cf6', letterSpacing: '0.5px' }}>
+                                                                                {item.cycleStart.split('-').reverse().map((x, i) => i === 2 ? x.slice(2) : x).join('/')} <span style={{opacity: 0.5}}>→</span> {item.cycleEnd.split('-').reverse().map((x, i) => i === 2 ? x.slice(2) : x).join('/')}
+                                                                            </div>
+                                                                            <div style={{ fontSize: '9px', fontWeight: '800', color: '#8b5cf6', textTransform: 'uppercase' }}>Month Cycle</div>
                                                                         </div>
                                                                     </>
                                                                 )}
@@ -2391,6 +2415,15 @@ const Staff = () => {
                                                         </div>
                                                     </div>
                                                 )}
+                                                {formData.staffType !== 'Fixed' && formData.staffType !== 'Daily' && (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', gridColumn: 'span 2' }}>
+                                                        <label style={{ fontSize: '10px', fontWeight: '800', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>Deduction Per Extra Leave (₹)</label>
+                                                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                                            <IndianRupee size={18} color="rgba(255,255,255,0.4)" style={{ position: 'absolute', left: '18px', pointerEvents: 'none' }} />
+                                                            <input type="number" className="premium-compact-input" placeholder="e.g. 500 (Optional)" style={{ width: '100%', height: '56px', padding: '0 20px 0 50px', fontSize: '14px', fontWeight: '700', borderRadius: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--primary)', outline: 'none' }} onFocus={(e) => { e.target.style.borderColor = 'var(--primary)'; e.target.style.boxShadow = '0 0 15px rgba(251,191,36,0.15)'; e.target.style.background = 'rgba(255,255,255,0.06)' }} onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; e.target.style.background = 'rgba(255,255,255,0.03)' }} value={formData.leaveDeductionRate || ''} onChange={(e) => setFormData({ ...formData, leaveDeductionRate: e.target.value })} />
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                             {formData.staffType !== 'Fixed' && formData.staffType !== 'Daily' && (
                                                 <div style={{
@@ -2577,93 +2610,32 @@ const Staff = () => {
 
                                         {/* Detailed Breakdown */}
                                         <div style={{ padding: '12px 16px 24px 16px', flexGrow: 1 }}>
-                                            {/* Formula Banner */}
-                                            <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)', borderRadius: '14px', padding: '10px 12px', marginBottom: '10px' }}>
-                                                <p style={{ margin: 0, fontSize: '9px', color: '#818cf8', fontWeight: '700', letterSpacing: '0.5px' }}>📐 HOW IS SALARY CALCULATED?</p>
-                                                <p style={{ margin: '5px 0 0 0', fontSize: '11px', color: 'rgba(255,255,255,0.65)', fontWeight: '600', lineHeight: '1.5' }}>
-                                                    (Present + Sundays + Extras) × ₹{selectedStaffReport.perDaySalary || Math.round((selectedStaffReport.salary || 0) / 30)}/day
-                                                </p>
-                                            </div>
-
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                {/* Salary calculation box already shows base salary, so separate block is redundant */}
-
-                                                {/* Days Present */}
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(16,185,129,0.07)', padding: '10px 12px', borderRadius: '12px', border: '1px solid rgba(16,185,129,0.14)' }}>
-                                                    <div>
-                                                        <p style={{ margin: 0, fontSize: '10px', color: '#10b981', fontWeight: '700' }}>✅ DAYS PRESENT</p>
-                                                        <p style={{ margin: '2px 0 0 0', fontSize: '9px', color: 'rgba(16,185,129,0.5)', fontWeight: '500' }}>Of {selectedStaffReport.workingDaysPassed || 0} working days passed</p>
-                                                    </div>
-                                                    <span style={{ fontWeight: '800', color: '#10b981', fontSize: '13px' }}>{selectedStaffReport.presentDays || 0} <small style={{ fontSize: '9px', opacity: 0.6 }}>days</small></span>
-                                                </div>
-
-                                                {/* Free Leaves Allowance */}
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(14,165,233,0.07)', padding: '10px 12px', borderRadius: '12px', border: '1px solid rgba(14,165,233,0.14)' }}>
-                                                    <div>
-                                                        <p style={{ margin: 0, fontSize: '10px', color: 'var(--primary)', fontWeight: '700' }}>🎫 TOTAL LEAVES TAKEN</p>
-                                                        <p style={{ margin: '2px 0 0 0', fontSize: '9px', color: 'rgba(14,165,233,0.5)', fontWeight: '500' }}>All leaves are unpaid as per policy</p>
-                                                    </div>
-                                                    <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '13px' }}>{selectedStaffReport.leavesTaken || 0} <small style={{ fontSize: '9px', opacity: 0.6 }}>days</small></span>
-                                                </div>
-
-                                                {/* Sunday Holidays (Paid) */}
-                                                {(selectedStaffReport.sundaysPassed || 0) > 0 && (
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(251, 191, 36, 0.05)', padding: '10px 12px', borderRadius: '12px', border: '1px solid rgba(251, 191, 36, 0.1)' }}>
-                                                        <div>
-                                                            <p style={{ margin: 0, fontSize: '10px', color: 'var(--primary)', fontWeight: '700' }}>⭐ SUNDAY HOLIDAYS</p>
-                                                            <p style={{ margin: '2px 0 0 0', fontSize: '9px', color: 'rgba(251, 191, 36, 0.5)', fontWeight: '500' }}>Automatically paid rest days</p>
-                                                        </div>
-                                                        <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '13px' }}>{selectedStaffReport.sundaysPassed} <small style={{ fontSize: '9px', opacity: 0.6 }}>days</small></span>
-                                                    </div>
-                                                )}
-
-                                                {/* Sunday Extras (Worked) */}
-                                                {(selectedStaffReport.sundaysWorked || 0) > 0 && (
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(99,102,241,0.07)', padding: '10px 12px', borderRadius: '12px', border: '1px solid rgba(99,102,241,0.14)' }}>
-                                                        <div>
-                                                            <p style={{ margin: 0, fontSize: '10px', color: '#818cf8', fontWeight: '700' }}>☀️ SUNDAYS WORKED</p>
-                                                            <p style={{ margin: '2px 0 0 0', fontSize: '9px', color: 'rgba(99,102,241,0.5)', fontWeight: '500' }}>Extra pay for holiday duty</p>
-                                                        </div>
-                                                        <div style={{ textAlign: 'right' }}>
-                                                            <p style={{ margin: 0, fontWeight: '800', color: '#818cf8', fontSize: '13px' }}>+{selectedStaffReport.sundaysWorked} days</p>
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '2px 0' }}></div>
-
-                                                {/* Unpaid Absences */}
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: (selectedStaffReport.extraLeaves || 0) > 0 ? 'rgba(244,63,94,0.08)' : 'rgba(255,255,255,0.02)', padding: '10px 12px', borderRadius: '12px', border: `1px solid ${(selectedStaffReport.extraLeaves || 0) > 0 ? 'rgba(244,63,94,0.2)' : 'rgba(255,255,255,0.04)'}` }}>
-                                                    <div>
-                                                        <p style={{ margin: 0, fontSize: '10px', color: (selectedStaffReport.extraLeaves || 0) > 0 ? '#f43f5e' : 'rgba(255,255,255,0.4)', fontWeight: '700' }}>❌ UNPAID ABSENT DAYS</p>
-                                                        <p style={{ margin: '2px 0 0 0', fontSize: '9px', color: 'rgba(255,255,255,0.2)', fontWeight: '500' }}>Beyond free allowance → deducted</p>
-                                                    </div>
-                                                    <div style={{ textAlign: 'right' }}>
-                                                        <p style={{ margin: 0, fontWeight: '800', color: (selectedStaffReport.extraLeaves || 0) > 0 ? '#f43f5e' : 'rgba(255,255,255,0.3)', fontSize: '13px' }}>{selectedStaffReport.extraLeaves || 0} days</p>
-                                                        {(selectedStaffReport.extraLeaves || 0) > 0 && (
-                                                            <p style={{ margin: '2px 0 0 0', fontSize: '10px', color: '#f43f5e', fontWeight: '700' }}>-₹{(selectedStaffReport.deduction || 0).toLocaleString()}</p>
-                                                        )}
-                                                    </div>
-                                                </div>
+                                                {/* Detailed Breakdown Removed */}
 
                                                 {/* Final calc box */}
-                                                <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '16px', padding: '15px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                                                    <p style={{ margin: '0 0 10px 0', fontSize: '10px', fontWeight: '900', color: 'rgba(255,255,255,0.4)', letterSpacing: '1px' }}>LEAVE CARRY-FORWARD POOL</p>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px' }}>
-                                                        <div>
-                                                            <div style={{ fontSize: '16px', fontWeight: '900', color: 'white' }}>{selectedStaffReport.totalLeaveAccrued}</div>
-                                                            <div style={{ fontSize: '9px', fontWeight: '700', color: 'rgba(255,255,255,0.3)' }}>ACCRUED (TOTAL)</div>
-                                                        </div>
-                                                        <div>
-                                                            <div style={{ fontSize: '16px', fontWeight: '900', color: '#f43f5e' }}>{selectedStaffReport.totalLeaveUsed}</div>
-                                                            <div style={{ fontSize: '9px', fontWeight: '700', color: 'rgba(255,255,255,0.3)' }}>USED (TILL DATE)</div>
-                                                        </div>
-                                                        <div>
-                                                            <div style={{ fontSize: '16px', fontWeight: '900', color: '#10b981' }}>{selectedStaffReport.availableLeave}</div>
-                                                            <div style={{ fontSize: '9px', fontWeight: '700', color: 'rgba(255,255,255,0.3)' }}>AVAILABLE (POOL)</div>
+                                                {selectedStaffReport.staffType !== 'Fixed' && selectedStaffReport.staffType !== 'Daily' && (
+                                                    <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '16px', padding: '15px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                                                        <p style={{ margin: '0 0 10px 0', fontSize: '10px', fontWeight: '900', color: 'rgba(255,255,255,0.4)', letterSpacing: '1px' }}>LEAVE CARRY-FORWARD POOL</p>
+                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                                                            <div>
+                                                                <div style={{ fontSize: '16px', fontWeight: '900', color: '#6366f1' }}>{selectedStaffReport.previousMonthCarryForward || 0}</div>
+                                                                <div style={{ fontSize: '9px', fontWeight: '700', color: 'rgba(255,255,255,0.4)' }}>PREVIOUS C/F</div>
+                                                            </div>
+                                                            <div>
+                                                                <div style={{ fontSize: '16px', fontWeight: '900', color: 'white' }}>{selectedStaffReport.allowedMonthLeave || 0}</div>
+                                                                <div style={{ fontSize: '9px', fontWeight: '700', color: 'rgba(255,255,255,0.4)' }}>ALLOWED LEAVES</div>
+                                                            </div>
+                                                            <div>
+                                                                <div style={{ fontSize: '16px', fontWeight: '900', color: '#10b981' }}>{selectedStaffReport.totalLeaveAvailable || 0}</div>
+                                                                <div style={{ fontSize: '9px', fontWeight: '700', color: 'rgba(255,255,255,0.4)' }}>TOTAL AVAILABLE</div>
+                                                            </div>
+                                                            <div>
+                                                                <div style={{ fontSize: '16px', fontWeight: '900', color: '#f43f5e' }}>{selectedStaffReport.leavesTakenThisMonth || 0}</div>
+                                                                <div style={{ fontSize: '9px', fontWeight: '700', color: 'rgba(255,255,255,0.4)' }}>UTILIZED THIS MONTH</div>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
+                                                )}
 
                                                 <div style={{ background: 'linear-gradient(135deg, rgba(251,191,36,0.1), rgba(251,191,36,0.03))', border: '1px solid rgba(251,191,36,0.25)', borderRadius: '14px', padding: '12px 14px', marginTop: '2px' }}>
                                                     <p style={{ margin: 0, fontSize: '9px', color: 'var(--primary)', fontWeight: '700', letterSpacing: '1px' }}>🧮 FINAL PAYOUT CALCULATION</p>
@@ -2673,7 +2645,6 @@ const Staff = () => {
                                                     </p>
                                                     <p style={{ margin: '5px 0 0 0', fontSize: '15px', fontWeight: '900', color: 'var(--primary)' }}>= ₹{(selectedStaffReport.finalSalary || 0).toLocaleString()} (TOTAL SALARY)</p>
                                                 </div>
-                                            </div>
                                         </div>
                                     </div>
 
@@ -2897,7 +2868,27 @@ const Staff = () => {
                                                                         ) : (
                                                                             <>
                                                                                 <div style={{ fontSize: '12px', fontWeight: '700', color: '#10b981' }}>{log.punchIn?.time ? formatTimeIST(log.punchIn.time) : '--'}</div>
-                                                                                <div style={{ fontSize: '12px', fontWeight: '700', color: '#f43f5e' }}>{log.punchOut?.time ? formatTimeIST(log.punchOut.time) : '--'}</div>
+                                                                                <div style={{ fontSize: '12px', fontWeight: '700', color: '#f43f5e', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                                    {log.punchOut?.time ? formatTimeIST(log.punchOut.time) : (
+                                                                                        log.punchIn?.time ? (
+                                                                                            <button
+                                                                                                onClick={() => {
+                                                                                                    setBackdateForm({
+                                                                                                        staffId: selectedStaffReport.staffId,
+                                                                                                        date: log.date,
+                                                                                                        status: log.status,
+                                                                                                        punchInTime: DateTime.fromISO(log.punchIn.time).setZone('Asia/Kolkata').toFormat('HH:mm'),
+                                                                                                        punchOutTime: ''
+                                                                                                    });
+                                                                                                    setShowBackdateModal(true);
+                                                                                                }}
+                                                                                                style={{ background: 'rgba(244, 63, 94, 0.2)', color: '#f43f5e', padding: '2px 8px', borderRadius: '4px', fontSize: '9px', border: '1px solid rgba(244, 63, 94, 0.4)', cursor: 'pointer', fontWeight: '900', letterSpacing: '0.5px' }}
+                                                                                            >
+                                                                                                MARK OUT
+                                                                                            </button>
+                                                                                        ) : '--'
+                                                                                    )}
+                                                                                </div>
                                                                             </>
                                                                         )}
                                                                     </td>

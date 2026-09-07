@@ -5,6 +5,18 @@ import './index.css'
 import App from './App.jsx'
 
 import { ThemeProvider } from './context/ThemeContext'
+import axios from 'axios'
+
+// Prevent browser caching globally for all GET requests in the software
+axios.interceptors.request.use((config) => {
+    if (config.method === 'get') {
+        config.params = { ...config.params, _t: new Date().getTime() };
+        config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+        config.headers['Pragma'] = 'no-cache';
+        config.headers['Expires'] = '0';
+    }
+    return config;
+});
 
 createRoot(document.getElementById('root')).render(
     <HelmetProvider>

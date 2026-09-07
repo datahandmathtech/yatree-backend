@@ -38,6 +38,8 @@ import { useCompany } from '../context/CompanyContext';
 import { useTheme } from '../context/ThemeContext';
 import SEO from '../components/SEO';
 import { todayIST, formatDateIST, nowIST, formatDateTimeIST } from '../utils/istUtils';
+import ImageUploader from '../components/common/ImageUploader';
+import SearchableSelect from '../components/common/SearchableSelect';
 
 const MAINTENANCE_CATEGORIES = [
     'Regular Service',
@@ -95,6 +97,7 @@ const Maintenance = () => {
     const [drillData, setDrillData] = useState({ vehicle: '', category: '', records: [] });
     const [expandedVehicle, setExpandedVehicle] = useState(null); // Added for Master Data Accordion
     const [showGarageSuggestions, setShowGarageSuggestions] = useState(false);
+    const [allGarages, setAllGarages] = useState([]);
 
     const shiftMonth = (amount) => {
         let newMonth = selectedMonth + amount;
@@ -163,7 +166,7 @@ const Maintenance = () => {
         amount: '',
         paymentMode: 'Cash',
         paymentStatus: 'Paid',
-        paymentSource: 'Office',
+        paymentSource: 'Paid',
         currentKm: '',
         nextServiceKm: '',
         status: 'Completed'
@@ -178,6 +181,7 @@ const Maintenance = () => {
         'Suspension',
         'Steering',
         'Fuel',
+        'AD Blue',
         'Exhaust',
         'Clutch / Transmission',
         'Brake',
@@ -215,9 +219,24 @@ const Maintenance = () => {
             fetchPending();
             fetchVehicles();
             fetchDrivers();
+            fetchAllGarages();
             if (viewMode === 'super') fetchAggregatedData();
         }
     }, [selectedCompany, selectedMonth, selectedYear, viewMode]);
+
+    const fetchAllGarages = async () => {
+        if (!selectedCompany?._id) return;
+        try {
+            const userInfoStr = localStorage.getItem('userInfo');
+            const userInfo = userInfoStr ? JSON.parse(userInfoStr) : null;
+            if (!userInfo?.token) return;
+
+            const { data } = await axios.get(`/api/admin/maintenance/garages/${selectedCompany._id}`, {
+                headers: { Authorization: `Bearer ${userInfo.token}` }
+            });
+            setAllGarages(data || []);
+        } catch (err) { console.error('Error fetching garages:', err); }
+    };
 
     const fetchAggregatedData = async () => {
         if (!selectedCompany?._id) return;
@@ -279,33 +298,47 @@ const Maintenance = () => {
         } catch (err) { console.error(err); }
     };
 
-    const fetchVehicles = async () => {
+    const fetchVehicles = async (overrideDate = null) => {
         if (!selectedCompany?._id) return;
         try {
             const userInfoStr = localStorage.getItem('userInfo');
             const userInfo = userInfoStr ? JSON.parse(userInfoStr) : null;
             if (!userInfo?.token) return;
 
-            const { data } = await axios.get(`/api/admin/vehicles/${selectedCompany._id}`, {
+            // In maintenance, we might want to default to the selected month instead of just current date
+            const defaultDate = new Date(selectedYear, selectedMonth, 0).toISOString().split('T')[0];
+            const targetDate = overrideDate || defaultDate;
+
+            const { data } = await axios.get(`/api/admin/vehicles/${selectedCompany._id}?usePagination=false&type=fleet&toDate=${targetDate}`, {
                 headers: { Authorization: `Bearer ${userInfo.token}` }
             });
             setVehicles(data.vehicles || []);
         } catch (err) { console.error(err); }
     };
 
-    const fetchDrivers = async () => {
+    const fetchDrivers = async (overrideDate = null) => {
         if (!selectedCompany?._id) return;
         try {
             const userInfoStr = localStorage.getItem('userInfo');
             const userInfo = userInfoStr ? JSON.parse(userInfoStr) : null;
             if (!userInfo?.token) return;
 
-            const { data } = await axios.get(`/api/admin/drivers/${selectedCompany._id}?usePagination=false`, {
+            const defaultDate = new Date(selectedYear, selectedMonth, 0).toISOString().split('T')[0];
+            const targetDate = overrideDate || defaultDate;
+
+            const { data } = await axios.get(`/api/admin/drivers/${selectedCompany._id}?usePagination=false&driverType=All&toDate=${targetDate}`, {
                 headers: { Authorization: `Bearer ${userInfo.token}` }
             });
             setDrivers(data.drivers || []);
         } catch (err) { console.error(err); }
     };
+
+    useEffect(() => {
+        if (showModal && formData.billDate) {
+            fetchDrivers(formData.billDate);
+            fetchVehicles(formData.billDate);
+        }
+    }, [formData.billDate, showModal]);
 
     const handleCreate = async (e) => {
         e.preventDefault();
@@ -387,7 +420,7 @@ const Maintenance = () => {
             amount: '',
             paymentMode: 'Cash',
             paymentStatus: 'Paid',
-            paymentSource: 'Office',
+            paymentSource: 'Paid',
             currentKm: '',
             nextServiceKm: '',
             status: 'Completed'
@@ -417,7 +450,7 @@ const Maintenance = () => {
             amount: record.amount,
             paymentMode: record.paymentMode || 'Cash',
             paymentStatus: record.paymentStatus || 'Paid',
-            paymentSource: record.paymentSource || 'Office',
+            paymentSource: record.paymentSource || 'Paid',
             currentKm: record.currentKm || '',
             nextServiceKm: record.nextServiceKm || '',
             status: record.status || 'Completed'
@@ -921,7 +954,7 @@ const Maintenance = () => {
                                 onChange={(e) => setSelectedYear(Number(e.target.value))}
                                 style={{ background: 'transparent', border: 'none', color: theme.primary, fontWeight: '900', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
                             >
-                                {[2023, 2024, 2025, 2026, 2027].map(y => (
+                                {Array.from({ length: new Date().getFullYear() - 2023 + 5 }, (_, i) => 2023 + i).map(y => (
                                     <option key={y} value={y} style={{ background: '#0f172a' }}>{y}-{String(y + 1).slice(-2)}</option>
                                 ))}
                             </select>
@@ -1096,7 +1129,7 @@ const Maintenance = () => {
                             style={{ background: 'transparent', border: 'none', color: 'white', fontWeight: '700', fontSize: '14px', width: '100%', outline: 'none', cursor: 'pointer', textOverflow: 'ellipsis' }}
                         >
                             <option value="All" style={{ background: '#1e293b', color: 'white' }}>All Cars</option>
-                            {uniqueVehicles.map(v => <option key={v} value={v} style={{ background: '#1e293b', color: 'white' }}>{v} ({vehicleStats[v] || 0})</option>)}
+                            {uniqueVehicles.filter(v => (vehicleStats[v] || 0) > 0).map(v => <option key={v} value={v} style={{ background: '#1e293b', color: 'white' }}>{v} ({vehicleStats[v]})</option>)}
                         </select>
                     </div>
                 </motion.div>
@@ -1114,8 +1147,8 @@ const Maintenance = () => {
                                 style={{ background: 'transparent', border: 'none', color: 'white', fontWeight: '700', fontSize: '14px', width: '100%', outline: 'none', cursor: 'pointer', textOverflow: 'ellipsis' }}
                             >
                                 <option value="All" style={{ background: '#1e293b', color: 'white' }}>All Types</option>
-                                {maintenanceTypes.map(t => (
-                                    <option key={t} value={t} style={{ background: '#1e293b', color: 'white' }}>{t} ({categoryStats[t] || 0})</option>
+                                {maintenanceTypes.filter(t => categoryStats[t] > 0).map(t => (
+                                    <option key={t} value={t} style={{ background: '#1e293b', color: 'white' }}>{t} ({categoryStats[t]})</option>
                                 ))}
                             </select>
                         </div>
@@ -1619,16 +1652,17 @@ const Maintenance = () => {
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))', gap: '20px' }}>
                                         <div>
                                             <label style={{ display: 'block', color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', marginBottom: '8px' }}>Vehicle *</label>
-                                            <select
-                                                className="input-field"
+                                            <SearchableSelect
+                                                options={(vehicles || []).map(v => ({ value: v._id, label: `${v.carNumber} (${v.model})` }))}
                                                 value={formData.vehicleId}
-                                                onChange={(e) => setFormData({ ...formData, vehicleId: e.target.value })}
-                                                required
-                                                style={{ width: '100%', height: '50px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', color: 'white', padding: '0 15px' }}
-                                            >
-                                                <option value="" style={{ background: '#0f172a' }}>Select Car</option>
-                                                {(vehicles || []).map(v => <option key={v._id} value={v._id} style={{ background: '#0f172a' }}>{v.carNumber} ({v.model})</option>)}
-                                            </select>
+                                                onChange={(vid) => {
+                                                    const selectedVehicle = (vehicles || []).find(v => v._id === vid);
+                                                    const autoDriverId = selectedVehicle?.currentDriver?._id || '';
+                                                    setFormData({ ...formData, vehicleId: vid, driverId: autoDriverId });
+                                                }}
+                                                placeholder="Search Vehicle..."
+                                                required={true}
+                                            />
                                         </div>
                                         <div>
                                             <label style={{ display: 'block', color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', marginBottom: '8px' }}>Driver (Optional)</label>
@@ -1763,7 +1797,7 @@ const Maintenance = () => {
                                                         >
                                                             {(() => {
                                                                 const search = (formData.garageName || '').toLowerCase();
-                                                                const filtered = uniqueGarages.filter(g => g.toLowerCase().includes(search));
+                                                                const filtered = allGarages.filter(g => g.toLowerCase().includes(search));
 
                                                                 if (filtered.length === 0) return (
                                                                     <div style={{ padding: '12px 15px', color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>
@@ -1821,6 +1855,7 @@ const Maintenance = () => {
                                                 <label style={{ color: 'white', fontSize: '12px', marginBottom: '8px', display: 'block' }}>Amount (₹) *</label>
                                                 <input required type="number" className="input-field" style={{ borderRadius: '10px' }} placeholder="0.00" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} />
                                             </div>
+
                                             <div>
                                                 <label style={{ color: 'white', fontSize: '12px', marginBottom: '8px', display: 'block' }}>Payment Source</label>
                                                 <select
@@ -1847,8 +1882,7 @@ const Maintenance = () => {
                                                 </select>
                                             </div>
                                             <div>
-                                                <label style={{ color: 'white', fontSize: '12px', marginBottom: '8px', display: 'block' }}>Bill Photo</label>
-                                                <input type="file" onChange={(e) => setBillPhoto(e.target.files[0])} style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', width: '100%' }} />
+                                                <ImageUploader file={billPhoto} onChange={setBillPhoto} label="Bill Photo" color="var(--primary)" />
                                             </div>
                                         </div>
                                     </div>
@@ -2045,3 +2079,4 @@ const Maintenance = () => {
 };
 
 export default Maintenance;
+

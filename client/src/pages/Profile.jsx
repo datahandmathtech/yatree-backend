@@ -285,7 +285,7 @@ const Profile = () => {
                                             <p style={{ margin: '5px 0 0', color: '#64748b', fontSize: '13px', lineHeight: '1.6', fontWeight: '500' }}>
                                                 Your administrator profile for <strong>{selectedCompany?.name || 'Your Hub'}</strong> is fully synchronized with the global database. 
                                                 Session ID: <span style={{ fontFamily: 'monospace', color: '#94a3b8' }}>{user._id?.substring(0, 12)}...</span>. 
-                                                Member since: <span style={{ color: theme.primary, fontWeight: '700' }}>{user.joiningDate ? new Date(user.joiningDate).toLocaleDateString() : 'Production Setup Phase'}</span>
+                                                Member since: <span style={{ color: theme.primary, fontWeight: '700' }}>{user.joiningDate ? new Date(user.joiningDate).toLocaleDateString('en-GB', {day: '2-digit', month: '2-digit', year: '2-digit'}) : 'Production Setup Phase'}</span>
                                             </p>
                                         </div>
                                     </div>
@@ -464,7 +464,7 @@ const Profile = () => {
                                                     <tr key={sub._id} style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
                                                         <td style={{ padding: '20px', borderRadius: '16px 0 0 16px', fontWeight: '700' }}>{sub.month}</td>
                                                         <td style={{ padding: '20px', fontWeight: '800', color: theme.primary }}>₹{sub.amount}</td>
-                                                        <td style={{ padding: '20px', color: '#64748b', fontSize: '14px' }}>{new Date(sub.paymentDate).toLocaleDateString()}</td>
+                                                        <td style={{ padding: '20px', color: '#64748b', fontSize: '14px' }}>{new Date(sub.paymentDate).toLocaleDateString('en-GB', {day: '2-digit', month: '2-digit', year: '2-digit'})}</td>
                                                         <td style={{ padding: '20px' }}>
                                                             <span style={{ 
                                                                 padding: '6px 12px', borderRadius: '10px', fontSize: '12px', fontWeight: '800',
@@ -543,6 +543,41 @@ const Profile = () => {
                                                             onChange={e => setBrandAssets({...brandAssets, signature: e.target.files[0]})}
                                                         />
                                                         <p style={{ color: '#64748b', fontSize: '11px', marginTop: '10px' }}>Recommended: Clear PNG with transparent background.</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Tax Settings */}
+                                            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '25px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                                <h3 style={{ color: 'white', fontSize: '16px', fontWeight: '800', marginBottom: '15px' }}>Tax & Billing Settings</h3>
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                                    <div>
+                                                        <label style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', display: 'block', marginBottom: '8px' }}>GST Rate (%)</label>
+                                                        <input 
+                                                            type="number" 
+                                                            value={selectedCompany?.gstRate !== undefined ? selectedCompany.gstRate : 5}
+                                                            onChange={(e) => {
+                                                                if(e.target.value >= 0) {
+                                                                    axios.put(`/api/admin/company/${selectedCompany._id}/settings`, { gstRate: e.target.value }).then(() => window.location.reload());
+                                                                }
+                                                            }}
+                                                            style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', display: 'block', marginBottom: '8px' }}>GST Number</label>
+                                                        <input 
+                                                            type="text" 
+                                                            value={selectedCompany?.gstNumber || ''}
+                                                            onChange={(e) => {
+                                                                // Debounce saving or rely on a generic save button (simplifying for now with blur)
+                                                            }}
+                                                            onBlur={(e) => {
+                                                                axios.put(`/api/admin/company/${selectedCompany._id}/settings`, { gstNumber: e.target.value });
+                                                            }}
+                                                            placeholder="e.g. 27ABCDE1234F1Z5"
+                                                            style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }}
+                                                        />
                                                     </div>
                                                 </div>
                                             </div>

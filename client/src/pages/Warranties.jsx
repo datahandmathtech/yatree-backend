@@ -424,7 +424,7 @@ const Warranties = () => {
                                             </td>
                                             <td style={{ padding: '15px' }}>
                                                 <div style={{ color: 'white', fontSize: '14px', fontWeight: '600' }}>{w.warrantyPeriod}</div>
-                                                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>From: {new Date(w.warrantyStartDate).toLocaleDateString('en-GB')}</div>
+                                                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>From: {new Date(w.warrantyStartDate).toLocaleDateString('en-GB', {day: '2-digit', month: '2-digit', year: '2-digit'})}</div>
                                             </td>
                                             <td style={{ padding: '15px' }}>
                                                 <div style={{
@@ -435,7 +435,7 @@ const Warranties = () => {
                                                     alignItems: 'center',
                                                     gap: '6px'
                                                 }}>
-                                                    {new Date(w.warrantyEndDate).toLocaleDateString('en-GB')}
+                                                    {new Date(w.warrantyEndDate).toLocaleDateString('en-GB', {day: '2-digit', month: '2-digit', year: '2-digit'})}
                                                     {expired && <AlertTriangle size={14} />}
                                                 </div>
                                                 <div style={{ fontSize: '11px', fontWeight: '600', color: expired ? '#f43f5e' : soon ? 'var(--primary)' : 'var(--text-muted)', marginTop: '2px' }}>{expired ? 'EXPIRED' : soon ? 'EXPIRING SOON' : 'VALID'}</div>
@@ -690,13 +690,13 @@ const Warranties = () => {
                                 )}
                                 <div className="glass-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)' }}>
                                     <label style={labelStyle}>PURCHASE INFO</label>
-                                    <div style={{ color: 'white', fontWeight: '600', marginBottom: '8px' }}>Date: {new Date(selectedWarranty.purchaseDate).toLocaleDateString()}</div>
+                                    <div style={{ color: 'white', fontWeight: '600', marginBottom: '8px' }}>Date: {new Date(selectedWarranty.purchaseDate).toLocaleDateString('en-GB', {day: '2-digit', month: '2-digit', year: '2-digit'})}</div>
                                     <div style={{ color: 'white', fontWeight: '600' }}>Supplier: {selectedWarranty.supplierName}</div>
                                 </div>
                                 <div className="glass-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)' }}>
                                     <label style={labelStyle}>WARRANTY STATUS</label>
                                     <div style={{ color: isExpired(selectedWarranty.warrantyEndDate) ? '#f43f5e' : '#10b981', fontWeight: '800', fontSize: '18px', marginBottom: '5px' }}>{selectedWarranty.status}</div>
-                                    <div style={{ fontSize: '13px', color: 'white' }}>Ends: {new Date(selectedWarranty.warrantyEndDate).toLocaleDateString()}</div>
+                                    <div style={{ fontSize: '13px', color: 'white' }}>Ends: {new Date(selectedWarranty.warrantyEndDate).toLocaleDateString('en-GB', {day: '2-digit', month: '2-digit', year: '2-digit'})}</div>
                                 </div>
                             </div>
 

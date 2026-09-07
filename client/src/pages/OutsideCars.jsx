@@ -15,8 +15,10 @@ const OutsideCars = () => {
     const { theme } = useTheme();
     const { selectedCompany } = useCompany();
     const [vehicles, setVehicles] = useState([]);
+    const [companyVehicles, setCompanyVehicles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [activeTab, setActiveTab] = useState('All');
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1); // 1-12 or 'All'
     const [selectedYear, setSelectedYear] = useState(new Date().getMonth() < 3 ? new Date().getFullYear() - 1 : new Date().getFullYear());
     const [selectedDay, setSelectedDay] = useState('All'); 
@@ -105,6 +107,7 @@ const OutsideCars = () => {
         dutyAmount: '',
         dropLocation: '',
         transactionType: 'Buy',
+        workBasis: 'Fix Basis',
         date: ''
     });
 
@@ -119,10 +122,15 @@ const OutsideCars = () => {
         setLoading(true);
         try {
             const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-            const { data } = await axios.get(`/api/admin/vehicles/${selectedCompany._id}?usePagination=false&type=outside`, {
+            const { data } = await axios.get(`/api/admin/vehicles/${selectedCompany._id}?usePagination=false&type=outside&includeBlocked=true`, {
                 headers: { Authorization: `Bearer ${userInfo.token}` }
             });
-            setVehicles(data.vehicles?.filter(v => v.isOutsideCar && !v.eventId) || []);
+            setVehicles(data.vehicles?.filter(v => v.isOutsideCar) || []);
+
+            const { data: compData } = await axios.get(`/api/admin/vehicles/${selectedCompany._id}?usePagination=false`, {
+                headers: { Authorization: `Bearer ${userInfo.token}` }
+            });
+            setCompanyVehicles(compData.vehicles?.filter(v => !v.isOutsideCar && !v.eventId) || []);
         } catch (err) { console.error(err); }
         finally { setLoading(false); }
     };
@@ -206,7 +214,7 @@ const OutsideCars = () => {
             doc.setLineWidth(0.5);
             doc.line(15, 68, 50, 68);
 
-            const totalAmount = filtered.reduce((sum, v) => sum + (Number(v.dutyAmount) || 0), 0);
+            const totalAmount = filtered.reduce((sum, v) => sum + (Number((v.transactionType === 'Buy' && v.buyAmount) ? v.buyAmount : v.dutyAmount) || 0), 0);
 
             doc.setFontSize(10);
             doc.setTextColor(100, 116, 139);
@@ -221,7 +229,7 @@ const OutsideCars = () => {
                 `${v.model} - ${v.carNumber?.split('#')[0]}`,
                 v.property || 'Direct',
                 v.dutyType || 'Standard',
-                `Rs. ${Number(v.dutyAmount || 0).toLocaleString('en-IN')}`
+                `Rs. ${Number(((v.transactionType === 'Buy' && v.buyAmount) ? v.buyAmount : v.dutyAmount) || 0).toLocaleString('en-IN')}`
             ]);
 
             autoTable(doc, {
@@ -303,17 +311,17 @@ const OutsideCars = () => {
         setFormData(prev => ({ ...prev, carNumber: upVal }));
         
         if (upVal.length > 1) {
-            const matches = vehicles.filter(v => {
-                const plate = v.carNumber?.split('#')[0] || '';
-                return plate.toUpperCase().includes(upVal);
+            const matches = [...vehicles, ...companyVehicles].filter(v => {
+                const plate = (v.carNumber?.split('#')[0] || v.carNumber || '').toUpperCase();
+                return plate.includes(upVal);
             });
             
             // Remove duplicates (by plate number)
             const uniqueMatches = [];
             const seen = new Set();
             matches.forEach(m => {
-                const plate = m.carNumber?.split('#')[0];
-                if (!seen.has(plate)) {
+                const plate = m.carNumber?.split('#')[0] || m.carNumber;
+                if (plate && !seen.has(plate)) {
                     seen.add(plate);
                     uniqueMatches.push(m);
                 }
@@ -323,7 +331,7 @@ const OutsideCars = () => {
             setShowSuggestions(true);
 
             // Exact match auto-fill
-            const exactMatch = uniqueMatches.find(m => (m.carNumber?.split('#')[0] || '').toUpperCase() === upVal);
+            const exactMatch = uniqueMatches.find(m => ((m.carNumber?.split('#')[0] || m.carNumber || '').toUpperCase() === upVal));
             if (exactMatch) {
                 setFormData(prev => ({
                     ...prev,
@@ -338,7 +346,7 @@ const OutsideCars = () => {
     };
 
     const selectSuggestion = (v) => {
-        const plate = v.carNumber?.split('#')[0];
+        const plate = v.carNumber?.split('#')[0] || v.carNumber;
         setFormData(prev => ({
             ...prev,
             carNumber: plate,
@@ -394,6 +402,7 @@ const OutsideCars = () => {
                 isOutsideCar: true,
                 status: 'active',
                 transactionType: formData.transactionType || 'Buy',
+                workBasis: formData.workBasis || 'Fix Basis',
                 createdAt: formData.date
             };
 
@@ -434,6 +443,7 @@ const OutsideCars = () => {
             dutyAmount: vehicle.dutyAmount,
             dropLocation: vehicle.dropLocation,
             transactionType: vehicle.transactionType || 'Buy',
+            workBasis: vehicle.workBasis || 'Fix Basis',
             date: vehicle.carNumber?.split('#')[1] || toISTDateString(vehicle.createdAt)
         });
         setSelectedId(vehicle._id);
@@ -459,8 +469,9 @@ const OutsideCars = () => {
 
         const matchesDate = dutyTagDateStr >= fromDate && dutyTagDateStr <= toDate;
         const matchesTransaction = (v.transactionType || 'Buy') === transactionFilter;
+        const matchesTab = activeTab === 'All' || v.workBasis === activeTab;
 
-        return matchesSearch && matchesOwner && matchesProperty && matchesDate && matchesTransaction;
+        return matchesSearch && matchesOwner && matchesProperty && matchesDate && matchesTransaction && matchesTab;
     }).sort((a, b) => {
         const dateA = a.carNumber?.split('#')[1] || '';
         const dateB = b.carNumber?.split('#')[1] || '';
@@ -468,7 +479,7 @@ const OutsideCars = () => {
         return new Date(b.createdAt) - new Date(a.createdAt);
     });
 
-    const totalPayable = filtered.reduce((sum, v) => sum + (v ? (Number(v.dutyAmount) || 0) : 0), 0);
+    const totalPayable = filtered.reduce((sum, v) => sum + (v ? (Number((v.transactionType === 'Buy' && v.buyAmount) ? v.buyAmount : v.dutyAmount) || 0) : 0), 0);
     const totalDutiesCount = filtered.reduce((sum, v) => sum + (v?.dutyType ? v.dutyType.split(' + ').filter(Boolean).length : 0), 0);
 
     // ── DYNAMIC FILTERS ──
@@ -476,7 +487,7 @@ const OutsideCars = () => {
         const owner = v.ownerName?.trim();
         const dutyDate = v.carNumber?.split('#')[1];
         if (owner && dutyDate >= fromDate && dutyDate <= toDate && (v.transactionType || 'Buy') === transactionFilter) {
-            acc[owner] = (acc[owner] || 0) + (Number(v.dutyAmount) || 0);
+            acc[owner] = (acc[owner] || 0) + (Number((v.transactionType === 'Buy' && v.buyAmount) ? v.buyAmount : v.dutyAmount) || 0);
         }
         return acc;
     }, {});
@@ -541,6 +552,18 @@ const OutsideCars = () => {
             <SEO title="Outside Fleet Command" description="Manage external vehicles and freelancer drivers for specific duties." />
 
             <style>{`
+                /* ===== MODAL BASE (GLOBAL OVERLAYS) ===== */
+                .modal-overlay { 
+                    position: fixed; inset: 0; 
+                    background: rgba(0,0,0,0.85); 
+                    backdrop-filter: blur(14px); 
+                    z-index: 2000; 
+                    display: flex; justify-content: center; align-items: center; 
+                    padding: clamp(10px, 3vw, 20px); 
+                }
+                @media (min-width: 1024px) {
+                    .modal-overlay { padding-left: calc(280px + clamp(10px, 3vw, 20px)); }
+                }
                 .bg-buy { 
                     background: linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(20, 83, 45, 0.2) 100%) !important; 
                     color: #4ade80 !important; 
@@ -670,6 +693,18 @@ const OutsideCars = () => {
                 <div className="flex-resp" style={{ gap: '12px', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                         <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: '14px', gap: '4px' }}>
+                            {['All', 'Fix Basis', 'Daily Basis'].map(tab => (
+                                <button key={tab} onClick={() => setActiveTab(tab)} style={{
+                                    padding: '8px 16px', borderRadius: '10px', border: 'none', fontSize: '11px', fontWeight: '900', cursor: 'pointer',
+                                    background: activeTab === tab ? 'rgba(255,255,255,0.1)' : 'transparent',
+                                    color: activeTab === tab ? '#ffffff' : 'rgba(255,255,255,0.3)',
+                                    transition: 'all 0.2s'
+                                }}>
+                                    {tab === 'All' ? 'All Cars' : tab}
+                                </button>
+                            ))}
+                        </div>
+                        <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: '14px', gap: '4px' }}>
                             {['Buy', 'Sell'].map(t => (
                                 <button key={t} onClick={() => setTransactionFilter(t)} style={{
                                     padding: '8px 16px', borderRadius: '10px', border: 'none', fontSize: '11px', fontWeight: '900', cursor: 'pointer',
@@ -689,7 +724,7 @@ const OutsideCars = () => {
                                 ))}
                             </select>
                             <select value={selectedYear} onChange={e => { setSelectedYear(Number(e.target.value)); setSelectedDay('All'); }} className="premium-compact-input" style={{ height: '40px', width: '85px', fontSize: '11px', padding: '0 10px' }}>
-                                {[2023, 2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}-{y + 1}</option>)}
+                                {Array.from({ length: new Date().getFullYear() - 2023 + 5 }, (_, i) => 2023 + i).map(y => <option key={y} value={y}>{y}-{y + 1}</option>)}
                             </select>
                         </div>
                     </div>
@@ -741,9 +776,10 @@ const OutsideCars = () => {
                                 <td style={{ padding: '16px 24px' }}>
                                     <div style={{ fontSize: '14px', fontWeight: '800', color: 'white' }}>{v.property || 'Direct'}</div>
                                     <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', gap: '4px' }}>{v.dutyType} {v.dropLocation && <>➜ {v.dropLocation}</>}</div>
+                                    {v.remarks && <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', marginTop: '4px', fontStyle: 'italic' }}>{v.remarks}</div>}
                                 </td>
                                 <td style={{ padding: '16px 24px', textAlign: 'right' }}>
-                                    <div style={{ fontSize: '16px', fontWeight: '1000', color: '#10b981' }}>₹{v.dutyAmount?.toLocaleString()}</div>
+                                    <div style={{ fontSize: '16px', fontWeight: '1000', color: '#10b981' }}>₹{((v.transactionType === 'Buy' && v.buyAmount) ? v.buyAmount : v.dutyAmount)?.toLocaleString()}</div>
                                 </td>
                                 <td style={{ padding: '16px 24px', textAlign: 'right' }}>
                                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
@@ -770,7 +806,7 @@ const OutsideCars = () => {
                                 </div>
                             </div>
                             <div style={{ textAlign: 'right' }}>
-                                <div style={{ fontSize: '16px', fontWeight: '1000', color: '#10b981' }}>₹{v.dutyAmount?.toLocaleString()}</div>
+                                <div style={{ fontSize: '16px', fontWeight: '1000', color: '#10b981' }}>₹{((v.transactionType === 'Buy' && v.buyAmount) ? v.buyAmount : v.dutyAmount)?.toLocaleString()}</div>
                                 <span className={`badge-ext ${v.transactionType === 'Buy' ? 'bg-buy' : 'bg-sell'}`} style={{ fontSize: '6px', padding: '2px 6px' }}>{v.transactionType}</span>
                             </div>
                         </div>
@@ -785,7 +821,10 @@ const OutsideCars = () => {
                             </div>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontWeight: '700' }}>{v.dutyType}</span>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontWeight: '700' }}>{v.dutyType}</span>
+                                {v.remarks && <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontStyle: 'italic', marginTop: '2px' }}>{v.remarks}</span>}
+                            </div>
                             <div style={{ display: 'flex', gap: '8px' }}>
                                 <button onClick={() => handleEdit(v)} style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: 'none', color: 'white' }}><Edit size={14} /></button>
                                 <button onClick={() => handleDelete(v._id)} style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(244, 63, 94, 0.1)', border: 'none', color: '#f43f5e' }}><Trash2 size={14} /></button>
@@ -824,11 +863,35 @@ const OutsideCars = () => {
                                 <div className="form-grid-2" style={{ gap: '20px', marginBottom: '20px' }}>
                                     <div className="premium-input-group">
                                         <label className="premium-label">Vehicle Plate *</label>
-                                        <input type="text" className="premium-compact-input" required value={formData.carNumber} onChange={e => handleCarNumberChange(e.target.value)} placeholder="RJ-XX-XX-XXXX" style={{ height: '52px', textTransform: 'uppercase' }} />
+                                        <input 
+                                            type="text" 
+                                            className="premium-compact-input" 
+                                            required 
+                                            value={formData.carNumber} 
+                                            onChange={e => handleCarNumberChange(e.target.value)} 
+                                            onFocus={() => {
+                                                if (!formData.carNumber) {
+                                                    const uniqueMatches = [];
+                                                    const seen = new Set();
+                                                    [...vehicles, ...companyVehicles].forEach(m => {
+                                                        const plate = m.carNumber?.split('#')[0] || m.carNumber;
+                                                        if (plate && !seen.has(plate)) {
+                                                            seen.add(plate);
+                                                            uniqueMatches.push(m);
+                                                        }
+                                                    });
+                                                    setSuggestions(uniqueMatches.slice(0, 15));
+                                                    setShowSuggestions(uniqueMatches.length > 0);
+                                                }
+                                            }}
+                                            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                                            placeholder="RJ-XX-XX-XXXX" 
+                                            style={{ height: '52px', textTransform: 'uppercase' }} 
+                                        />
                                         <AnimatePresence>
                                             {showSuggestions && suggestions.length > 0 && (
                                                 <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="suggestions-dropdown" style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1e293b', borderRadius: '12px', zIndex: 100, border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden' }}>
-                                                    {suggestions.map((s, i) => <div key={i} onClick={() => selectSuggestion(s)} style={{ padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)', color: 'white', fontSize: '13px' }}>{s.carNumber?.split('#')[0]} ({s.ownerName})</div>)}
+                                                    {suggestions.map((s, i) => <div key={i} onClick={() => selectSuggestion(s)} style={{ padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)', color: 'white', fontSize: '13px' }}>{s.carNumber?.split('#')[0] || s.carNumber} {s.ownerName ? `(${s.ownerName})` : '(Company Car)'}</div>)}
                                                 </motion.div>
                                             )}
                                         </AnimatePresence>
@@ -866,6 +929,13 @@ const OutsideCars = () => {
                                         <datalist id="typeList">{dutyTypeSuggestions.map(t => <option key={t} value={t} />)}</datalist>
                                     </div>
                                     <div className="premium-input-group">
+                                        <label className="premium-label">Work Basis *</label>
+                                        <select className="premium-compact-input" required value={formData.workBasis} onChange={e => setFormData({ ...formData, workBasis: e.target.value })} style={{ height: '52px' }}>
+                                            <option value="Fix Basis" style={{ background: '#0f172a' }}>Fix Basis</option>
+                                            <option value="Daily Basis" style={{ background: '#0f172a' }}>Daily Basis</option>
+                                        </select>
+                                    </div>
+                                    <div className="premium-input-group">
                                         <label className="premium-label">Payout Amount (₹) *</label>
                                         <input type="number" className="premium-compact-input" required value={formData.dutyAmount} onChange={e => setFormData({ ...formData, dutyAmount: e.target.value })} placeholder="0.00" style={{ height: '52px', fontSize: '18px', fontWeight: '950', color: '#10b981' }} />
                                     </div>
@@ -885,3 +955,4 @@ const OutsideCars = () => {
 };
 
 export default OutsideCars;
+

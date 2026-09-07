@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from '../api/axios';
-import { Plus, Minus, Search, Filter, MoreVertical, Trash2, Edit2, ShieldAlert, User as UserIcon, Users, Clock, FileText, CheckCircle, XCircle, Briefcase, IndianRupee, Eye, X, User } from 'lucide-react';
+import { Plus, Minus, Search, Filter, MoreVertical, Trash2, Edit2, ShieldAlert, User as UserIcon, Users, Clock, FileText, CheckCircle, XCircle, Briefcase, IndianRupee, Eye, X, User, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useCompany } from '../context/CompanyContext';
 import { useTheme } from '../context/ThemeContext';
 import SEO from '../components/SEO';
+import ImageUploader from '../components/common/ImageUploader';
+import SearchableSelect from '../components/common/SearchableSelect';
 import {
     todayIST,
     toISTDateString,
@@ -102,7 +104,8 @@ const Drivers = ({ isSubComponent = false }) => {
 
     // Documentation & Overtime States
     const [docs, setDocs] = useState({
-        aadharCard: null,
+        aadharCardFront: null,
+        aadharCardBack: null,
         drivingLicense: null,
         offerLetter: null
     });
@@ -339,7 +342,7 @@ const Drivers = ({ isSubComponent = false }) => {
             setNightStayBonus('');
             setSameDayReturnBonus('');
             setSameDayReturnEnabled(false);
-            setDocs({ aadharCard: null, drivingLicense: null, offerLetter: null });
+            setDocs({ aadharCardFront: null, aadharCardBack: null, drivingLicense: null, offerLetter: null });
             setOvertime({ enabled: false, threshold: 9, rate: 0 });
             setManualDutyForm({
                 date: '',
@@ -366,7 +369,7 @@ const Drivers = ({ isSubComponent = false }) => {
         try {
             const userInfo = JSON.parse(localStorage.getItem('userInfo'));
             if (!userInfo) return;
-            const { data } = await axios.get(`/api/admin/drivers/${selectedCompany._id}?usePagination=false&isFreelancer=false`, {
+            const { data } = await axios.get(`/api/admin/drivers/${selectedCompany._id}?usePagination=false&isFreelancer=false&includeAll=true`, {
                 headers: { Authorization: `Bearer ${userInfo.token}` }
             });
             setDrivers(data.drivers || []);
@@ -400,7 +403,8 @@ const Drivers = ({ isSubComponent = false }) => {
             formData.append('overtimeRate', overtime.rate);
 
             // Documents
-            if (docs.aadharCard) formData.append('aadharCard', docs.aadharCard);
+            if (docs.aadharCardFront) formData.append('aadharCardFront', docs.aadharCardFront);
+            if (docs.aadharCardBack) formData.append('aadharCardBack', docs.aadharCardBack);
             if (docs.drivingLicense) formData.append('drivingLicense', docs.drivingLicense);
             if (docs.offerLetter) formData.append('offerLetter', docs.offerLetter);
 
@@ -412,7 +416,7 @@ const Drivers = ({ isSubComponent = false }) => {
             });
             setShowModal(false);
             setName(''); setMobile(''); setUsername(''); setPassword(''); setLicenseNumber(''); setIsFreelancer(false); setDailyWage(''); setNightStayBonus(''); setSameDayReturnBonus('');
-            setDocs({ aadharCard: null, drivingLicense: null, offerLetter: null });
+            setDocs({ aadharCardFront: null, aadharCardBack: null, drivingLicense: null, offerLetter: null });
             setOvertime({ enabled: false, threshold: 9, rate: 0 });
             fetchDrivers();
             alert('Driver registered successfully');
@@ -472,7 +476,8 @@ const Drivers = ({ isSubComponent = false }) => {
             }
 
             // Documents
-            if (docs.aadharCard) formData.append('aadharCard', docs.aadharCard);
+            if (docs.aadharCardFront) formData.append('aadharCardFront', docs.aadharCardFront);
+            if (docs.aadharCardBack) formData.append('aadharCardBack', docs.aadharCardBack);
             if (docs.drivingLicense) formData.append('drivingLicense', docs.drivingLicense);
             if (docs.offerLetter) formData.append('offerLetter', docs.offerLetter);
 
@@ -485,7 +490,7 @@ const Drivers = ({ isSubComponent = false }) => {
             setShowEditModal(false);
             setEditingDriver(null);
             setEditForm({ name: '', mobile: '', username: '', password: '', licenseNumber: '', dailyWage: '', nightStayBonus: '', sameDayReturnBonus: '', sameDayReturnEnabled: false, isFreelancer: false, overtimeEnabled: false, overtimeThreshold: 9, overtimeRate: 0 });
-            setDocs({ aadharCard: null, drivingLicense: null, offerLetter: null });
+            setDocs({ aadharCardFront: null, aadharCardBack: null, drivingLicense: null, offerLetter: null });
             fetchDrivers();
             alert('Driver updated successfully');
         } catch (err) {
@@ -511,7 +516,7 @@ const Drivers = ({ isSubComponent = false }) => {
             overtimeThreshold: driver.overtime?.thresholdHours || 9,
             overtimeRate: driver.overtime?.ratePerHour || 0
         });
-        setDocs({ aadharCard: null, drivingLicense: null, offerLetter: null });
+        setDocs({ aadharCardFront: null, aadharCardBack: null, drivingLicense: null, offerLetter: null });
         setShowEditModal(true);
     };
 
@@ -527,9 +532,9 @@ const Drivers = ({ isSubComponent = false }) => {
             }
             
             fetchDrivers();
-            toast.success(`Document ${status} successfully`);
+            alert(`Document ${status} successfully`);
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Error verifying document');
+            alert(err.response?.data?.message || 'Error verifying document');
         }
     };
 
@@ -763,7 +768,21 @@ const Drivers = ({ isSubComponent = false }) => {
                                                 </span>
                                             </td>
                                             <td style={{ padding: '20px 25px', textAlign: 'right', borderTopRightRadius: '12px', borderBottomRightRadius: '12px' }}>
-                                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                                    <div style={{ display: 'flex', gap: '8px', marginRight: 'auto' }}>
+                                                        {(!driver.documents || !driver.documents.some(d => ['Aadhaar Card', 'Aadhaar Front', 'Aadhaar Back'].includes(d.documentType) && d.imageUrl)) && (
+                                                            <div title="Aadhaar missing" style={{ display: 'flex', alignItems: 'center', color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)', padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                                                                <AlertTriangle size={14} style={{ marginRight: '6px' }} />
+                                                                <span style={{ fontSize: '10px', fontWeight: '800', textTransform: 'uppercase' }}>Missing Aadhaar</span>
+                                                            </div>
+                                                        )}
+                                                        {(!driver.documents || !driver.documents.some(d => d.documentType === 'Driving License' && d.imageUrl)) && (
+                                                            <div title="Driving License missing" style={{ display: 'flex', alignItems: 'center', color: '#f43f5e', background: 'rgba(244, 63, 94, 0.1)', padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(244, 63, 94, 0.2)' }}>
+                                                                <AlertTriangle size={14} style={{ marginRight: '6px' }} />
+                                                                <span style={{ fontSize: '10px', fontWeight: '800', textTransform: 'uppercase' }}>Missing DL</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                     <button
                                                         onClick={() => navigate(`/admin/drivers-panel?tab=settlement&driver=${driver.name}`)}
                                                         className="glass-card-hover-effect"
@@ -887,7 +906,19 @@ const Drivers = ({ isSubComponent = false }) => {
                                         </div>
                                         <div style={{ background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '10px' }}>
                                             <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '4px', letterSpacing: '0.5px' }}>LICENSE</div>
-                                            <div style={{ color: 'white', fontWeight: '600', fontSize: '14px', fontFamily: 'monospace' }}>{driver.licenseNumber || 'N/A'}</div>
+                                            <div style={{ color: 'white', fontWeight: '600', fontSize: '14px', fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                {driver.licenseNumber || 'N/A'}
+                                                {(!driver.documents || !driver.documents.some(d => ['Aadhaar Card', 'Aadhaar Front', 'Aadhaar Back'].includes(d.documentType) && d.imageUrl)) && (
+                                                    <span title="Aadhaar missing" style={{ display: 'flex', alignItems: 'center', color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)', padding: '2px 6px', borderRadius: '4px', fontSize: '9px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                                                        <AlertTriangle size={12} style={{ marginRight: '4px' }} /> NO AADHAAR
+                                                    </span>
+                                                )}
+                                                {(!driver.documents || !driver.documents.some(d => d.documentType === 'Driving License' && d.imageUrl)) && (
+                                                    <span title="Driving License missing" style={{ display: 'flex', alignItems: 'center', color: '#f43f5e', background: 'rgba(244, 63, 94, 0.1)', padding: '2px 6px', borderRadius: '4px', fontSize: '9px', border: '1px solid rgba(244, 63, 94, 0.2)' }}>
+                                                        <AlertTriangle size={12} style={{ marginRight: '4px' }} /> NO DL
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
 
@@ -1007,30 +1038,20 @@ const Drivers = ({ isSubComponent = false }) => {
                                         <p style={{ color: '#8b5cf6', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                             <FileText size={14} /> Documentation (Uploads)
                                         </p>
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                                             {[
-                                                { label: 'Aadhar Card', key: 'aadharCard' },
+                                                { label: 'Aadhar Front', key: 'aadharCardFront' },
+                                                { label: 'Aadhar Back', key: 'aadharCardBack' },
                                                 { label: 'License Copy', key: 'drivingLicense' },
                                                 { label: 'Offer Letter', key: 'offerLetter' }
                                             ].map(item => (
-                                                <label key={item.key} style={{
-                                                    display: 'flex',
-                                                    flexDirection: 'column',
-                                                    alignItems: 'center',
-                                                    gap: '8px',
-                                                    padding: '12px',
-                                                    background: docs[item.key] ? 'rgba(139, 92, 246, 0.1)' : 'rgba(255,255,255,0.03)',
-                                                    borderRadius: '12px',
-                                                    border: docs[item.key] ? '1px dashed #8b5cf6' : '1px dashed rgba(255,255,255,0.1)',
-                                                    cursor: 'pointer',
-                                                    transition: 'all 0.2s ease'
-                                                }}>
-                                                    <div style={{ color: docs[item.key] ? '#8b5cf6' : 'rgba(255,255,255,0.4)' }}>
-                                                        {docs[item.key] ? <CheckCircle size={20} /> : <Plus size={20} />}
-                                                    </div>
-                                                    <span style={{ fontSize: '10px', color: docs[item.key] ? '#8b5cf6' : 'white', fontWeight: '700', textAlign: 'center' }}>{docs[item.key] ? docs[item.key].name.substring(0, 15) + '...' : item.label}</span>
-                                                    <input type="file" hidden onChange={(e) => setDocs({ ...docs, [item.key]: e.target.files[0] })} />
-                                                </label>
+                                                <ImageUploader 
+                                                    key={item.key}
+                                                    label={item.label}
+                                                    file={docs[item.key]}
+                                                    onChange={(file) => setDocs({ ...docs, [item.key]: file })}
+                                                    color="#8b5cf6"
+                                                />
                                             ))}
                                         </div>
                                     </div>
@@ -1126,22 +1147,34 @@ const Drivers = ({ isSubComponent = false }) => {
                             <form onSubmit={handleUpdateDriver} style={{ padding: '25px' }}>
                                     <div style={{ marginBottom: '20px' }}>
                                         <p style={{ color: 'var(--primary)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '15px' }}>Identity & Access</p>
-                                        <div style={{ marginBottom: '15px' }}>
-                                            <label className="input-label" style={{ marginBottom: '6px' }}>Username</label>
-                                            <input className="input-field" value={editForm.username} onChange={(e) => setEditForm({ ...editForm, username: e.target.value })} style={{ background: 'rgba(0,0,0,0.2)' }} />
+                                        <div className="form-grid-2" style={{ marginBottom: '15px' }}>
+                                            <div>
+                                                <label className="input-label" style={{ marginBottom: '6px' }}>Full Name</label>
+                                                <input className="input-field" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} style={{ background: 'rgba(0,0,0,0.2)' }} />
+                                            </div>
+                                            <div>
+                                                <label className="input-label" style={{ marginBottom: '6px' }}>Mobile Number</label>
+                                                <input className="input-field" value={editForm.mobile} onChange={(e) => setEditForm({ ...editForm, mobile: e.target.value })} style={{ background: 'rgba(0,0,0,0.2)' }} />
+                                            </div>
                                         </div>
-                                        <div style={{ marginBottom: '15px' }}>
-                                            <label className="input-label" style={{ marginBottom: '6px' }}>Password</label>
-                                            <input 
-                                                type="password" 
-                                                name="edit-driver-password" 
-                                                autoComplete="new-password"
-                                                className="input-field" 
-                                                value={editForm.password} 
-                                                onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} 
-                                                placeholder="Enter new password" 
-                                                style={{ background: 'rgba(0,0,0,0.2)' }} 
-                                            />
+                                        <div className="form-grid-2" style={{ marginBottom: '15px' }}>
+                                            <div>
+                                                <label className="input-label" style={{ marginBottom: '6px' }}>Username</label>
+                                                <input className="input-field" value={editForm.username} onChange={(e) => setEditForm({ ...editForm, username: e.target.value })} style={{ background: 'rgba(0,0,0,0.2)' }} />
+                                            </div>
+                                            <div>
+                                                <label className="input-label" style={{ marginBottom: '6px' }}>Password</label>
+                                                <input 
+                                                    type="password" 
+                                                    name="edit-driver-password" 
+                                                    autoComplete="new-password"
+                                                    className="input-field" 
+                                                    value={editForm.password} 
+                                                    onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} 
+                                                    placeholder="Enter new password" 
+                                                    style={{ background: 'rgba(0,0,0,0.2)' }} 
+                                                />
+                                            </div>
                                         </div>
                                     </div>
 
@@ -1160,9 +1193,6 @@ const Drivers = ({ isSubComponent = false }) => {
                                             <label className="input-label" style={{ marginBottom: '6px' }}>License Number</label>
                                             <input className="input-field" value={editForm.licenseNumber} onChange={(e) => setEditForm({ ...editForm, licenseNumber: e.target.value })} style={{ background: 'rgba(0,0,0,0.2)' }} />
                                         </div>
-                                    </div>
-
-                                    <div className="form-grid-2" style={{ marginBottom: '15px' }}>
                                         <div>
                                             <label className="input-label" style={{ marginBottom: '6px' }}>Night Stay Bonus</label>
                                             <div style={{ position: 'relative' }}>
@@ -1170,17 +1200,13 @@ const Drivers = ({ isSubComponent = false }) => {
                                                 <input type="number" className="input-field" value={editForm.nightStayBonus} onChange={(e) => setEditForm({ ...editForm, nightStayBonus: e.target.value })} style={{ background: 'rgba(0,0,0,0.2)', paddingLeft: '28px' }} />
                                             </div>
                                         </div>
-                                    {editForm.sameDayReturnEnabled && (
-                                        <div className="form-grid-1" style={{ marginBottom: '15px' }}>
-                                            <div>
-                                                <label className="input-label" style={{ marginBottom: '6px' }}>Same Day Return Bonus</label>
-                                                <div style={{ position: 'relative' }}>
-                                                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>₹</span>
-                                                    <input type="number" className="input-field" value={editForm.sameDayReturnBonus} onChange={(e) => setEditForm({ ...editForm, sameDayReturnBonus: e.target.value })} style={{ background: 'rgba(0,0,0,0.2)', paddingLeft: '28px' }} />
-                                                </div>
+                                        <div>
+                                            <label className="input-label" style={{ marginBottom: '6px' }}>Same Day Bonus</label>
+                                            <div style={{ position: 'relative' }}>
+                                                <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>₹</span>
+                                                <input type="number" className="input-field" value={editForm.sameDayReturnBonus} onChange={(e) => setEditForm({ ...editForm, sameDayReturnBonus: e.target.value })} style={{ background: 'rgba(0,0,0,0.2)', paddingLeft: '28px' }} />
                                             </div>
                                         </div>
-                                    )}
                                     </div>
 
                                     <div style={{ marginTop: '10px', padding: '15px', background: 'rgba(59, 130, 246, 0.05)', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.1)', marginBottom: '20px' }}>
@@ -1244,25 +1270,20 @@ const Drivers = ({ isSubComponent = false }) => {
 
                                             <div style={{ marginTop: '15px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '15px' }}>
                                                 <label className="input-label" style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', display: 'block' }}>Update Documents</label>
-                                                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                                                     {[
-                                                        { label: '+ Aadhaar', key: 'aadharCard' },
-                                                        { label: '+ License', key: 'drivingLicense' },
-                                                        { label: '+ Offer Letter', key: 'offerLetter' }
+                                                        { label: 'Aadhaar Front', key: 'aadharCardFront' },
+                                                        { label: 'Aadhaar Back', key: 'aadharCardBack' },
+                                                        { label: 'License Copy', key: 'drivingLicense' },
+                                                        { label: 'Offer Letter', key: 'offerLetter' }
                                                     ].map(item => (
-                                                        <label key={item.key} style={{
-                                                            padding: '6px 12px',
-                                                            background: docs[item.key] ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255,255,255,0.05)',
-                                                            borderRadius: '8px',
-                                                            border: '1px solid rgba(255,255,255,0.1)',
-                                                            fontSize: '10px',
-                                                            color: docs[item.key] ? '#a78bfa' : 'white',
-                                                            cursor: 'pointer',
-                                                            fontWeight: '700'
-                                                        }}>
-                                                            {docs[item.key] ? 'File Ready' : item.label}
-                                                            <input type="file" hidden onChange={(e) => setDocs({ ...docs, [item.key]: e.target.files[0] })} />
-                                                        </label>
+                                                        <ImageUploader 
+                                                            key={item.key}
+                                                            label={item.label}
+                                                            file={docs[item.key]}
+                                                            onChange={(file) => setDocs({ ...docs, [item.key]: file })}
+                                                            color="#8b5cf6"
+                                                        />
                                                     ))}
                                                 </div>
                                             </div>
@@ -1381,12 +1402,13 @@ const Drivers = ({ isSubComponent = false }) => {
                                     </div>
                                     <div>
                                         <label className="input-label">Vehicle *</label>
-                                        <select className="input-field" value={manualDutyForm.vehicleId} onChange={(e) => setManualDutyForm({ ...manualDutyForm, vehicleId: e.target.value })} required style={{ appearance: 'auto' }}>
-                                            <option value="" style={{ background: '#1e293b', color: 'white' }}>Select Vehicle</option>
-                                            {vehicles.map(v => (
-                                                <option key={v._id} value={v._id} style={{ background: '#1e293b', color: 'white' }}>{v.carNumber} ({v.model})</option>
-                                            ))}
-                                        </select>
+                                        <SearchableSelect 
+                                            options={vehicles.map(v => ({ value: v._id, label: `${v.carNumber} (${v.model})` }))}
+                                            value={manualDutyForm.vehicleId}
+                                            onChange={(val) => setManualDutyForm({ ...manualDutyForm, vehicleId: val })}
+                                            placeholder="Search Vehicle..."
+                                            required={true}
+                                        />
                                     </div>
                                 </div>
 
@@ -1469,31 +1491,22 @@ const Drivers = ({ isSubComponent = false }) => {
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                                     <div>
                                         <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: '800', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>Assign Vehicle</label>
-                                        <select
-                                            required
+                                        <SearchableSelect
+                                            options={vehicles.filter(v => {
+                                                const isToday = punchInForm.date?.split('T')[0] === getToday();
+                                                if (!isToday) return true;
+                                                if (!v.currentDriver) return true;
+                                                const currentDriverId = (v.currentDriver._id || v.currentDriver).toString();
+                                                return currentDriverId === selectedDriverForManual?._id.toString();
+                                            }).map(v => ({ value: v._id, label: `${v.carNumber} - ${v.model}` }))}
                                             value={punchInForm.vehicleId}
-                                            onChange={(e) => {
-                                                const vId = e.target.value;
+                                            onChange={(vId) => {
                                                 const selectedV = vehicles.find(v => v._id === vId);
                                                 setPunchInForm({ ...punchInForm, vehicleId: vId, km: selectedV?.lastOdometer || '' });
                                             }}
-                                            style={{ width: '100%', height: '54px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '0 20px', color: 'white', outline: 'none', fontSize: '14px', fontWeight: '600', transition: 'all 0.3s' }}
-                                        >
-                                            <option value="" style={{ background: '#0a0a0c' }}>Choose Vehicle</option>
-                                            {vehicles.filter(v => {
-                                                const isToday = punchInForm.date?.split('T')[0] === getToday();
-                                                if (!isToday) return true;
-
-                                                // Allow if no driver assigned
-                                                if (!v.currentDriver) return true;
-
-                                                // Allow if the assigned driver is same as the one we are punching in
-                                                const currentDriverId = (v.currentDriver._id || v.currentDriver).toString();
-                                                return currentDriverId === selectedDriverForManual?._id.toString();
-                                            }).map(v => (
-                                                <option key={v._id} value={v._id} style={{ background: '#0a0a0c' }}>{v.carNumber} - {v.model}</option>
-                                            ))}
-                                        </select>
+                                            placeholder="Search Vehicle..."
+                                            required={true}
+                                        />
                                     </div>
 
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>

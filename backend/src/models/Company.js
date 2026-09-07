@@ -32,6 +32,14 @@ const companySchema = new mongoose.Schema({
     },
     whatsappNumber: {
         type: String
+    },
+    gstRate: {
+        type: Number,
+        default: 5
+    },
+    gstNumber: {
+        type: String,
+        default: ''
     }
 }, { timestamps: true });
 

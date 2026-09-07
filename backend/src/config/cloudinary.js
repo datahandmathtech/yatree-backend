@@ -13,6 +13,7 @@ const storage = new CloudinaryStorage({
     params: {
         folder: 'taxi-fleet-crm/documents',
         allowed_formats: ['jpg', 'png', 'jpeg', 'pdf'],
+        resource_type: 'auto',
         public_id: (req, file) => {
             const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
             return file.fieldname + '-' + uniqueSuffix;

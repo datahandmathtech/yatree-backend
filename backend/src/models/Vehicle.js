@@ -52,11 +52,25 @@ const vehicleSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
+    buyAmount: {
+        type: Number,
+        default: 0
+    },
     property: {
         type: String // For outside cars: Client/Property name (e.g. Hotel Taj)
     },
     dropLocation: {
         type: String // For outside cars
+    },
+    remarks: {
+        type: String // For outside cars / event duties
+    },
+    guestCount: {
+        type: Number,
+        default: 0
+    },
+    guestName: {
+        type: String
     },
     dutyTime: {
         type: String // For outside cars: e.g. "08:00 AM", "Night Shift"
@@ -110,6 +124,40 @@ const vehicleSchema = new mongoose.Schema({
     lastOdometer: {
         type: Number,
         default: 0
+    },
+    lastAirCheckDate: {
+        type: Date,
+        default: null
+    },
+    lastAirCheckedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+    },
+    workBasis: {
+        type: String,
+        enum: ['Fix Basis', 'Daily Basis'],
+        default: 'Fix Basis'
+    },
+    // Advanced Billing
+    billingDetails: {
+        serviceName: { type: String },
+        baseRate: { type: Number, default: 0 },
+        baseKms: { type: Number, default: 0 },
+        baseHours: { type: Number, default: 0 },
+        extraKmRate: { type: Number, default: 0 },
+        extraHourRate: { type: Number, default: 0 },
+        driverAllowanceRate: { type: Number, default: 0 },
+        
+        // Calculated post-duty
+        actualKms: { type: Number, default: 0 },
+        actualHours: { type: Number, default: 0 },
+        extraKms: { type: Number, default: 0 },
+        extraHours: { type: Number, default: 0 },
+        extraKmAmount: { type: Number, default: 0 },
+        extraHourAmount: { type: Number, default: 0 },
+        driverAllowanceAmount: { type: Number, default: 0 },
+        totalBilledAmount: { type: Number, default: 0 }
     }
 }, {
     timestamps: true,
@@ -146,5 +194,10 @@ vehicleSchema.virtual('documentStatuses').get(function () {
         };
     });
 });
+
+// Indexes for performance optimization
+vehicleSchema.index({ eventId: 1 });
+vehicleSchema.index({ company: 1, isOutsideCar: 1 });
+vehicleSchema.index({ currentDriver: 1 });
 
 module.exports = mongoose.model('Vehicle', vehicleSchema);

@@ -72,7 +72,7 @@ const BorderTax = () => {
     };
 
     useEffect(() => {
-        if (selectedCompany) {
+        if (selectedCompany?._id) {
             fetchData();
             fetchEntries();
         }
@@ -84,7 +84,7 @@ const BorderTax = () => {
             const vehRes = await axios.get(`/api/admin/vehicles/${selectedCompany._id}?usePagination=false&type=all`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            const dvrRes = await axios.get(`/api/admin/drivers/${selectedCompany._id}?usePagination=false`, {
+            const dvrRes = await axios.get(`/api/admin/drivers/${selectedCompany._id}?usePagination=false&driverType=All&month=${selectedMonth + 1}&year=${selectedYear}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             // Filter out temporary duty cars (which have '#' in their carNumber)

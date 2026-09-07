@@ -282,31 +282,46 @@ const DriverPortal = () => {
             }
         }
 
+        setIsSubmitting(true);
+
+        const compressImage = async (file) => {
+            return file; // Bypass compression as CameraModal already returns low-res, 0.6 quality JPEG. Prevents web worker hang.
+        };
+
         let longitude = 0;
         let latitude = 0;
         let address = 'Location Disabled (Permission Denied)';
 
         try {
             const pos = await new Promise((resolve, reject) => {
-                navigator.geolocation.getCurrentPosition(resolve, reject, {
-                    enableHighAccuracy: true,
-                    timeout: 5000
-                });
+                const timer = setTimeout(() => {
+                    reject(new Error("Geolocation timeout manually triggered"));
+                }, 4000);
+
+                navigator.geolocation.getCurrentPosition(
+                    (p) => { clearTimeout(timer); resolve(p); },
+                    (e) => { clearTimeout(timer); reject(e); },
+                    { enableHighAccuracy: true, maximumAge: 10000, timeout: 4000 }
+                );
             });
             latitude = pos.coords.latitude;
             longitude = pos.coords.longitude;
-            // Removed slow nominatim reverse geocoding API to speed up punch in/out
             address = `Tracked: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
         } catch (err) {
             console.warn('Location acquisition failed or timed out:', err);
-            // Don't block punch-in if location fails, just use 0,0
         }
+
+        const [compressedSelfie, compressedKmPhoto, compressedCarSelfie] = await Promise.all([
+            compressImage(selfie),
+            compressImage(kmPhoto),
+            compressImage(carSelfie)
+        ]);
 
         const formData = new FormData();
         formData.append('km', km);
-        formData.append('selfie', selfie);
-        formData.append('kmPhoto', kmPhoto);
-        formData.append('carSelfie', carSelfie);
+        formData.append('selfie', compressedSelfie);
+        formData.append('kmPhoto', compressedKmPhoto);
+        formData.append('carSelfie', compressedCarSelfie);
         formData.append('dutyCount', '1');
         formData.append('specialPay', '0');
         formData.append('specialPayRemark', '');
@@ -323,18 +338,22 @@ const DriverPortal = () => {
             formData.append('otherRemarks', otherRemarks);
             formData.append('fuelFilled', fuelFilled);
             if (fuelFilled) {
-                fuelEntries.forEach(entry => {
+                const fuelSlipsPromises = fuelEntries.map(entry => compressImage(entry.slip));
+                const compFuelSlips = await Promise.all(fuelSlipsPromises);
+                fuelEntries.forEach((entry, idx) => {
                     formData.append('fuelAmounts', entry.amount);
                     formData.append('fuelKMs', entry.km);
                     formData.append('fuelTypes', entry.fuelType);
-                    formData.append('fuelSlips', entry.slip);
+                    formData.append('fuelSlips', compFuelSlips[idx]);
                 });
             }
             formData.append('parkingPaid', parkingPaid);
             if (parkingPaid) {
-                parkingEntries.forEach((entry) => {
+                const parkingSlipsPromises = parkingEntries.map(entry => compressImage(entry.slip));
+                const compParkingSlips = await Promise.all(parkingSlipsPromises);
+                parkingEntries.forEach((entry, idx) => {
                     formData.append('parkingAmounts', entry.amount);
-                    formData.append('parkingSlips', entry.slip);
+                    formData.append('parkingSlips', compParkingSlips[idx]);
                 });
             }
             formData.append('outsideTripOccurred', outsideTripOccurred);
@@ -391,6 +410,17 @@ const DriverPortal = () => {
             setMessage({ type: 'error', text: t('requestFailed') });
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleAirCheck = async () => {
+        try {
+            await axios.post('/api/driver/air-check', {}, {
+                headers: { Authorization: `Bearer ${user.token}` }
+            });
+            alert('Tire air check recorded successfully! Admin has been notified.');
+        } catch (err) {
+            alert(err.response?.data?.message || 'Error recording air check');
         }
     };
 
@@ -880,6 +910,27 @@ const DriverPortal = () => {
                                         }}
                                     >
                                         <Car size={18} /> {t('parking')}
+                                    </button>
+                                    <button
+                                        onClick={handleAirCheck}
+                                        style={{
+                                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                            color: 'white',
+                                            height: '42px',
+                                            padding: '0 14px',
+                                            borderRadius: '12px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '6px',
+                                            border: 'none',
+                                            boxShadow: '0 6px 16px rgba(16, 185, 129, 0.25)',
+                                            cursor: 'pointer',
+                                            fontWeight: '700',
+                                            fontSize: '13px'
+                                        }}
+                                    >
+                                        <CheckCircle size={18} /> Air Check
                                     </button>
                                     {showPunchOut && !showPunchOutForm && (
                                         <button
@@ -1654,11 +1705,11 @@ const DriverPortal = () => {
                                                                 {entry.type === 'fuel' && (
                                                                     <>
                                                                         <div className="input-wrapper-full">
-                                                                            <label className="input-label" style={{ fontSize: '10px' }}>{t('volume_optional')}</label>
+                                                                            <label className="input-label" style={{ fontSize: '10px' }}>{entry.fuelType === 'Electric' ? t('charging_units') : t('volume_optional')}</label>
                                                                             <input
                                                                                 type="number"
                                                                                 className="input-field"
-                                                                                placeholder="L"
+                                                                                placeholder={entry.fuelType === 'Electric' ? "kWh" : "L"}
                                                                                 value={entry.quantity || ''}
                                                                                 onChange={(e) => {
                                                                                     const newEntries = [...expenseEntries];
@@ -1674,11 +1725,11 @@ const DriverPortal = () => {
                                                                             />
                                                                         </div>
                                                                         <div className="input-wrapper-full">
-                                                                            <label className="input-label" style={{ fontSize: '10px' }}>{t('rate_per_l')} *</label>
+                                                                            <label className="input-label" style={{ fontSize: '10px' }}>{entry.fuelType === 'Electric' ? t('rate_per_kwh') : t('rate_per_l')} *</label>
                                                                             <input
                                                                                 type="number"
                                                                                 className="input-field"
-                                                                                placeholder="₹/L"
+                                                                                placeholder={entry.fuelType === 'Electric' ? "₹/kWh" : "₹/L"}
                                                                                 value={entry.rate || ''}
                                                                                 onChange={(e) => {
                                                                                     const newEntries = [...expenseEntries];
@@ -1718,8 +1769,8 @@ const DriverPortal = () => {
                                                                 <>
                                                                     <div className="input-wrapper-full" style={{ marginTop: '4px', marginBottom: '16px' }}>
                                                                         <label className="input-label" style={{ fontSize: '10px', marginBottom: '6px' }}>{t('fuelType')}</label>
-                                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                                                                            {['Diesel', 'Petrol', 'CNG'].map((type) => (
+                                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px' }}>
+                                                                            {['Diesel', 'Petrol', 'CNG', 'Electric'].map((type) => (
                                                                                 <button
                                                                                     key={type}
                                                                                     type="button"

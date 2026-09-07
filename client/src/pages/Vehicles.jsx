@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import SEO from '../components/SEO';
 import { todayIST, formatDateIST } from '../utils/istUtils';
+import ImageUploader from '../components/common/ImageUploader';
 
 const Vehicles = () => {
     const { theme } = useTheme();
@@ -31,6 +32,7 @@ const Vehicles = () => {
     const [fastagBank, setFastagBank] = useState('');
     const [seatingCapacity, setSeatingCapacity] = useState('4');
     const [remarks, setRemarks] = useState('');
+    const [workBasis, setWorkBasis] = useState('Fix Basis');
 
     const [creating, setCreating] = useState(false);
     const [docs, setDocs] = useState({
@@ -68,7 +70,7 @@ const Vehicles = () => {
             const userInfo = JSON.parse(localStorage.getItem('userInfo'));
             if (!userInfo) return;
             // Disable pagination for management view to show all vehicles
-            const { data } = await axios.get(`/api/admin/vehicles/${selectedCompany._id}?usePagination=false&type=fleet`, {
+            const { data } = await axios.get(`/api/admin/vehicles/${selectedCompany._id}?usePagination=false&type=fleet&includeBlocked=true`, {
                 headers: { Authorization: `Bearer ${userInfo.token}` }
             });
             // Handle both paginated and non-paginated responses
@@ -103,6 +105,7 @@ const Vehicles = () => {
             });
             const allAlerts = data.expiringAlerts || [];
             const filteredAlerts = allAlerts.filter(alert => {
+                if (alert.type === 'Event') return false;
                 if (user?.role === 'Admin') return true;
                 if ((alert.type === 'Vehicle' || alert.type === 'Service') && !user?.permissions?.vehiclesManagement) return false;
                 if (alert.type === 'Driver' && !user?.permissions?.driversService) return false;
@@ -128,6 +131,7 @@ const Vehicles = () => {
             formData.append('fastagBalance', fastagBalance || 0);
             formData.append('fastagBank', fastagBank);
             formData.append('seatingCapacity', seatingCapacity || '4');
+            formData.append('workBasis', workBasis);
             formData.append('remarks', remarks);
 
             // Add Documents
@@ -246,11 +250,13 @@ const Vehicles = () => {
     }, [vehicles]);
 
     const [searchTerm, setSearchTerm] = useState('');
+    const [activeTab, setActiveTab] = useState('All');
 
-    const filteredVehicles = deduplicatedVehicles.filter(v =>
-        v.carNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        v.model?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredVehicles = deduplicatedVehicles.filter(v => {
+        const matchesSearch = v.carNumber?.toLowerCase().includes(searchTerm.toLowerCase()) || v.model?.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesTab = activeTab === 'All' || v.workBasis === activeTab;
+        return matchesSearch && matchesTab;
+    });
 
 
 
@@ -441,7 +447,7 @@ const Vehicles = () => {
 
                             setEditingId(null); setCarNumber(''); setModel(''); setCarType('SUV'); 
                             setFastagNumber(''); setFastagBalance(''); setFastagBank(''); 
-                            setSeatingCapacity('4'); setRemarks('');
+                            setSeatingCapacity('4'); setRemarks(''); setWorkBasis('Fix Basis');
                             setShowModal(true); 
                         }} style={{ height: '48px', padding: '0 15px', borderRadius: '12px', fontWeight: '800', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                             <Plus size={20} /> <span className="hide-mobile">Add Vehicle</span><span className="show-mobile">Add</span>
@@ -449,6 +455,27 @@ const Vehicles = () => {
                     </div>
                 </div>
             </header>
+
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', overflowX: 'auto', paddingBottom: '5px' }}>
+                {['All', 'Fix Basis', 'Daily Basis'].map(tab => (
+                    <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        style={{
+                            padding: '10px 20px',
+                            borderRadius: '12px',
+                            background: activeTab === tab ? 'var(--primary)' : 'rgba(255,255,255,0.03)',
+                            color: activeTab === tab ? '#fff' : 'rgba(255,255,255,0.5)',
+                            border: activeTab === tab ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                            fontWeight: '800',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                        }}
+                    >
+                        {tab === 'All' ? 'All Cars' : tab}
+                    </button>
+                ))}
+            </div>
 
             <div className="grid-1-2-2-3" style={{ paddingBottom: '40px' }}>
                 {filteredVehicles.length > 0 ? (
@@ -492,6 +519,7 @@ const Vehicles = () => {
                                             setFastagBank(v.fastagBank || '');
                                             setSeatingCapacity(v.seatingCapacity || '4');
                                             setRemarks(v.remarks || '');
+                                            setWorkBasis(v.workBasis || 'Fix Basis');
                                             setShowModal(true);
                                         }}
                                         style={{ background: 'rgba(255,255,255,0.05)', color: 'white', padding: '8px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)', transition: '0.2s' }}
@@ -735,6 +763,24 @@ const Vehicles = () => {
                                             </select>
                                         </div>
                                     </div>
+                                    <div className="form-group">
+                                        <label>Work Basis *</label>
+                                        <div style={{ position: 'relative' }}>
+                                            <div style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary)' }}>
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                            </div>
+                                            <select
+                                                className="input-field"
+                                                style={{ paddingLeft: '45px', height: '54px', appearance: 'none', cursor: 'pointer' }}
+                                                value={workBasis}
+                                                onChange={(e) => setWorkBasis(e.target.value)}
+                                                required
+                                            >
+                                                <option value="Fix Basis" style={{ background: '#0f172a' }}>Fix Basis</option>
+                                                <option value="Daily Basis" style={{ background: '#0f172a' }}>Daily Basis</option>
+                                            </select>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -868,10 +914,40 @@ const Vehicles = () => {
                                         {doc ? (
                                             <>
                                                 <div
-                                                    style={{ height: '160px', borderRadius: '16px', overflow: 'hidden', cursor: 'pointer', position: 'relative' }}
-                                                    onClick={() => window.open(doc.imageUrl)}
+                                                    style={{ height: '160px', borderRadius: '16px', overflow: 'hidden', cursor: 'pointer', position: 'relative', background: 'rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                    onClick={async () => {
+                                                        if (doc.imageUrl && doc.imageUrl.toLowerCase().includes('.pdf')) {
+                                                            try {
+                                                                const response = await fetch(doc.imageUrl);
+                                                                if (!response.ok) throw new Error('Network response was not ok');
+                                                                const blob = await response.blob();
+                                                                const blobUrl = window.URL.createObjectURL(blob);
+                                                                const a = document.createElement('a');
+                                                                a.href = blobUrl;
+                                                                a.download = `${type}_DOCUMENT.pdf`;
+                                                                document.body.appendChild(a);
+                                                                a.click();
+                                                                document.body.removeChild(a);
+                                                                window.URL.revokeObjectURL(blobUrl);
+                                                            } catch (error) {
+                                                                console.error('Download failed:', error);
+                                                                window.open(doc.imageUrl, '_blank');
+                                                            }
+                                                        } else {
+                                                            window.open(doc.imageUrl);
+                                                        }
+                                                    }}
                                                 >
-                                                    <img src={doc.imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                    {doc.imageUrl && doc.imageUrl.toLowerCase().includes('.pdf') ? (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                                            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(244, 63, 94, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                                                            </div>
+                                                            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', fontWeight: 'bold' }}>View PDF Document</span>
+                                                        </div>
+                                                    ) : (
+                                                        <img src={doc.imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                    )}
                                                     <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', opacity: 0, transition: '0.3s', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseEnter={(e) => e.currentTarget.style.opacity = 1} onMouseLeave={(e) => e.currentTarget.style.opacity = 0}>
                                                         <ExternalLink size={24} color="white" />
                                                     </div>
@@ -934,13 +1010,23 @@ const Vehicles = () => {
                                     </div>
                                 </div>
                                 <div>
-                                    <label style={{ display: 'block', fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontWeight: '800', marginBottom: '8px', textTransform: 'uppercase' }}>Scan / Photo</label>
-                                    <input type="file" onChange={(e) => setDocToUpload({ ...docToUpload, file: e.target.files[0] })} style={{ color: 'white', fontSize: '12px', marginTop: '10px' }} />
+                                    <ImageUploader 
+                                        file={docToUpload.file} 
+                                        onChange={(file) => setDocToUpload({ ...docToUpload, file })} 
+                                        label="Scan / Photo" 
+                                        color="var(--primary)" 
+                                    />
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'flex-end' }}>
                                     <button
                                         className="btn-primary"
-                                        onClick={() => handleUploadSingleDoc(showDocsModal._id)}
+                                        onClick={() => {
+                                            if (docToUpload.file && docToUpload.file.size > 10 * 1024 * 1024) {
+                                                alert("File size is too large (" + (docToUpload.file.size / (1024*1024)).toFixed(1) + " MB). Maximum allowed size is 10 MB.");
+                                                return;
+                                            }
+                                            handleUploadSingleDoc(showDocsModal._id);
+                                        }}
                                         disabled={uploadingDoc}
                                         style={{ height: '48px', width: '100%', borderRadius: '12px', fontWeight: '900' }}
                                     >

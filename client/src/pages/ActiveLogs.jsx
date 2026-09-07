@@ -23,6 +23,7 @@ import SEO from '../components/SEO';
 import { todayIST, toISTDateString, formatDateIST, nowIST } from '../utils/istUtils';
 import { ChevronLeft, ChevronRight, ShoppingCart, TrendingUp } from 'lucide-react';
 import PremiumDateInput from '../components/common/PremiumDateInput';
+import ImageUploader from '../components/common/ImageUploader';
 
 const ActiveLogs = () => {
     const { selectedCompany } = useCompany();
@@ -95,6 +96,16 @@ const ActiveLogs = () => {
     const [photos, setPhotos] = useState([]);
     const [submitting, setSubmitting] = useState(false);
 
+    const handlePhotoChange = (index, file) => {
+        const newPhotos = [...photos];
+        if (file) {
+            newPhotos[index] = file;
+        } else {
+            newPhotos.splice(index, 1);
+        }
+        setPhotos(newPhotos);
+    };
+
     useEffect(() => {
         if (selectedCompany && fromDate && toDate) {
             fetchLogs();
@@ -127,7 +138,7 @@ const ActiveLogs = () => {
 
             const [vRes, dRes] = await Promise.all([
                 axios.get(`/api/admin/vehicles/${selectedCompany._id}?usePagination=false&type=fleet`, { headers: { Authorization: `Bearer ${userInfo.token}` } }),
-                axios.get(`/api/admin/drivers/${selectedCompany._id}?usePagination=false&isFreelancer=false`, { headers: { Authorization: `Bearer ${userInfo.token}` } })
+                axios.get(`/api/admin/drivers/${selectedCompany._id}?usePagination=false&driverType=All&isFreelancer=false`, { headers: { Authorization: `Bearer ${userInfo.token}` } })
             ]);
 
             setVehicles(vRes.data.vehicles || []);
@@ -145,8 +156,8 @@ const ActiveLogs = () => {
             Object.keys(formData).forEach(key => fd.append(key, formData[key]));
             fd.append('companyId', selectedCompany._id);
 
-            Array.from(photos).forEach(file => {
-                fd.append('photos', file);
+            photos.forEach(file => {
+                if (file) fd.append('photos', file);
             });
 
             const userInfo = JSON.parse(localStorage.getItem('userInfo'));
@@ -374,7 +385,7 @@ const ActiveLogs = () => {
                                 onChange={(e) => setSelectedYear(parseInt(e.target.value))}
                                 style={{ background: 'transparent', border: 'none', color: 'var(--primary)', padding: '8px 12px', fontWeight: '900', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
                             >
-                                {[2023, 2024, 2025, 2026, 2027].map(y => (
+                                {Array.from({ length: new Date().getFullYear() - 2023 + 5 }, (_, i) => 2023 + i).map(y => (
                                     <option key={y} value={y} style={{ background: '#0f172a' }}>FY {y}-{String(y + 1).slice(-2)}</option>
                                 ))}
                             </select>
@@ -603,7 +614,7 @@ const ActiveLogs = () => {
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                                         <div>
                                             <label className="input-label" style={{ marginBottom: '10px', display: 'block' }}>Vehicle Identification</label>
-                                            <select className="input-field" style={{ height: '54px', borderRadius: '15px' }} value={formData.vehicleId} onChange={e => setFormData({ ...formData, vehicleId: e.target.value })} required>
+                                            <select className="input-field" style={{ height: '54px', borderRadius: '15px' }} value={formData.vehicleId} onChange={e => { const vid = e.target.value; const sv = vehicles.find(v => v._id === vid); setFormData({ ...formData, vehicleId: vid, driverId: sv?.currentDriver?._id || '' }); }} required>
                                                 <option value="" style={{ background: '#0f172a' }}>Select Vehicle</option>
                                                 {vehicles.map(v => <option key={v._id} value={v._id} style={{ background: '#0f172a' }}>{v.carNumber} ({v.model})</option>)}
                                             </select>
@@ -650,8 +661,30 @@ const ActiveLogs = () => {
 
                                     <div>
                                         <label className="input-label" style={{ marginBottom: '10px', display: 'block' }}>Upload Evidence (Photos)</label>
-                                        <div style={{ position: 'relative' }}>
-                                            <input type="file" multiple onChange={e => setPhotos(e.target.files)} className="input-field" style={{ height: '54px', borderRadius: '15px', paddingTop: '15px', cursor: 'pointer', outline: 'none' }} />
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '15px' }}>
+                                            {photos.map((p, idx) => (
+                                                <ImageUploader 
+                                                    key={idx} 
+                                                    file={p} 
+                                                    onChange={(f) => {
+                                                        const newP = [...photos];
+                                                        if (f) newP[idx] = f; else newP.splice(idx, 1);
+                                                        setPhotos(newP);
+                                                    }} 
+                                                    label={`Photo ${idx + 1}`} 
+                                                    color="#ef4444" 
+                                                />
+                                            ))}
+                                            {photos.length < 5 && (
+                                                <ImageUploader 
+                                                    file={null} 
+                                                    onChange={(f) => {
+                                                        if (f) setPhotos([...photos, f]);
+                                                    }} 
+                                                    label={`Add Photo`} 
+                                                    color="#ef4444" 
+                                                />
+                                            )}
                                         </div>
                                     </div>
 
@@ -696,3 +729,4 @@ const ActiveLogs = () => {
 };
 
 export default ActiveLogs;
+

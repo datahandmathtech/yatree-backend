@@ -9,6 +9,7 @@ const {
     getAllDrivers,
     getAllVehicles,
     toggleVehicleStatus,
+    resolveAirCheck,
     updateDriver,
     updateVehicle,
     deleteDriver,
@@ -36,6 +37,7 @@ const {
     updateFuelEntry,
     approveRejectExpense,
     getPendingFuelExpenses,
+    getPendingAllowances,
     addAdvance,
     getAdvances,
     deleteAdvance,
@@ -70,6 +72,7 @@ const {
     deleteAccidentLog,
     updateAttendance,
     updateMaintenanceRecord,
+    getUniqueGarages,
     updateStaff,
     getPendingLeaveRequests,
     getAllLeaveRequests,
@@ -80,52 +83,36 @@ const {
     addPendingExpenseFromAdmin,
     getPendingMaintenanceExpenses,
     getLiveFeed,
+    getLiveMap,
     getAllLoans,
     createLoan,
     updateLoan,
     deleteLoan,
     recordLoanRepayment,
     markSalaryAsPaid,
-    deleteSalaryPayment,
-    getSalaryPayments,
-    updateCompanyBrand
+    getSalaryPayments
 } = require('../controllers/adminController');
 const {
     createEvent,
     getEvents,
     getEventDetails,
     updateEvent,
-    deleteEvent
+    deleteEvent,
+    addRateCard,
+    updateRateCard,
+    deleteRateCard
 } = require('../controllers/eventController');
 const { protect, admin, adminOrExecutive, checkCompany } = require('../middleware/authMiddleware');
 const { storage } = require('../config/cloudinary');
 const multer = require('multer');
 const upload = multer({ storage });
 
-// Proxy Image to bypass CORS (Public to allow browser Image tags in PDFs)
-router.get('/proxy-image', async (req, res) => {
-    try {
-        const { url } = req.query;
-        if (!url) return res.status(400).json({ message: 'URL is required' });
-        
-        const axios = require('axios');
-        const response = await axios.get(url, { responseType: 'arraybuffer' });
-        
-        res.set('Access-Control-Allow-Origin', '*');
-        res.set('Content-Type', response.headers['content-type'] || 'image/png');
-        res.send(response.data);
-    } catch (error) {
-        console.error('Proxy image error:', error.message);
-        res.status(500).json({ message: 'Error proxying image' });
-    }
-});
-
-
 router.use(protect);
 
-
 const driverUpload = upload.fields([
-    { name: 'aadharCard', maxCount: 1 },
+    { name: 'profilePhoto', maxCount: 1 },
+    { name: 'aadharCardFront', maxCount: 1 },
+    { name: 'aadharCardBack', maxCount: 1 },
     { name: 'drivingLicense', maxCount: 1 },
     { name: 'addressProof', maxCount: 1 },
     { name: 'offerLetter', maxCount: 1 }
@@ -140,8 +127,10 @@ const vehicleUpload = upload.fields([
 ]);
 
 // Shared Routes (Admin & Executive)
+router.put('/company/:companyId/settings', adminOrExecutive, checkCompany, require('../controllers/adminController').updateCompanySettings);
 router.get('/dashboard/:companyId', adminOrExecutive, checkCompany, getDashboardStats);
 router.get('/live-feed/:companyId', adminOrExecutive, checkCompany, getLiveFeed);
+router.get('/live-map/:companyId', adminOrExecutive, checkCompany, getLiveMap);
 router.get('/vehicle-monthly-details/:companyId', adminOrExecutive, checkCompany, getVehicleMonthlyDetails);
 router.get('/reports/:companyId', adminOrExecutive, checkCompany, getDailyReports);
 router.get('/vehicles/:companyId', adminOrExecutive, checkCompany, getAllVehicles);
@@ -160,6 +149,7 @@ const freelancerUpload = upload.fields([
 
 router.post('/freelancers/punch-in', adminOrExecutive, checkCompany, freelancerUpload, freelancerPunchIn);
 router.post('/freelancers/punch-out', adminOrExecutive, checkCompany, freelancerUpload, freelancerPunchOut);
+router.get('/maintenance/garages/:companyId', adminOrExecutive, checkCompany, getUniqueGarages);
 router.get('/maintenance/:companyId', adminOrExecutive, checkCompany, getMaintenanceRecords);
 router.get('/maintenance/pending/:companyId', adminOrExecutive, checkCompany, getPendingMaintenanceExpenses);
 router.post('/maintenance', adminOrExecutive, checkCompany, upload.single('billPhoto'), addMaintenanceRecord);
@@ -170,6 +160,7 @@ router.delete('/maintenance/:id', adminOrExecutive, deleteMaintenanceRecord);
 // Operational Routes (Shared Admin & Executive)
 router.patch('/drivers/:id/status', adminOrExecutive, checkCompany, toggleDriverStatus);
 router.patch('/vehicles/:id/status', adminOrExecutive, checkCompany, toggleVehicleStatus);
+router.patch('/vehicles/:id/resolve-air-check', adminOrExecutive, checkCompany, resolveAirCheck);
 router.post('/drivers/:id/documents', adminOrExecutive, checkCompany, upload.single('document'), uploadDriverDocument);
 router.patch('/drivers/:id/documents/:docId/verify', adminOrExecutive, checkCompany, verifyDriverDocument);
 router.patch('/drivers/:driverId/approve-trip', adminOrExecutive, checkCompany, approveNewTrip);
@@ -196,6 +187,7 @@ router.get('/fuel/:companyId', adminOrExecutive, checkCompany, getFuelEntries);
 router.put('/fuel/:id', adminOrExecutive, checkCompany, updateFuelEntry);
 router.delete('/fuel/:id', adminOrExecutive, checkCompany, deleteFuelEntry);
 router.get('/fuel/pending/:companyId', adminOrExecutive, checkCompany, getPendingFuelExpenses);
+router.get('/allowances/pending/:companyId', adminOrExecutive, checkCompany, getPendingAllowances);
 
 router.post('/parking', adminOrExecutive, checkCompany, addParkingEntry);
 router.get('/parking/:companyId', adminOrExecutive, checkCompany, getParkingEntries);
@@ -241,7 +233,6 @@ router.get('/staff-stats/:companyId', adminOrExecutive, checkCompany, getStaffSt
 router.delete('/staff-attendance/:id', adminOrExecutive, checkCompany, deleteStaffAttendance);
 router.post('/staff-attendance/backdate', adminOrExecutive, checkCompany, addBackdatedAttendance);
 router.post('/salary-payment', adminOrExecutive, checkCompany, markSalaryAsPaid);
-router.delete('/salary-payment/:id', adminOrExecutive, checkCompany, deleteSalaryPayment);
 router.get('/salary-payments/:companyId', adminOrExecutive, checkCompany, getSalaryPayments);
 
 // Leave Requests
@@ -271,6 +262,9 @@ router.get('/events/details/:eventId', adminOrExecutive, checkCompany, getEventD
 router.put('/events/:id', adminOrExecutive, checkCompany, updateEvent);
 router.delete('/events/:id', adminOrExecutive, checkCompany, deleteEvent);
 
-// Company Branding
-router.put('/company/:companyId/brand', admin, upload.fields([{ name: 'logo', maxCount: 1 }, { name: 'signature', maxCount: 1 }]), updateCompanyBrand);
+// Rate Cards
+router.post('/events/:id/ratecard', adminOrExecutive, checkCompany, addRateCard);
+router.put('/events/:id/ratecard/:rateId', adminOrExecutive, checkCompany, updateRateCard);
+router.delete('/events/:id/ratecard/:rateId', adminOrExecutive, checkCompany, deleteRateCard);
+
 module.exports = router;

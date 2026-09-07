@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 // @route   POST /api/admin/events
 // @access  Private/Admin
 const createEvent = asyncHandler(async (req, res) => {
-    const { name, companyId, client, date, location, description, totalRevenue, advanceAmount, amountReceived, status } = req.body;
+    const { name, companyId, client, date, location, description, totalRevenue, advanceAmount, amountReceived, status, proformaAmount } = req.body;
 
     if (!name || !companyId || !date) {
         return res.status(400).json({ message: 'Please provide name, companyId and date' });
@@ -23,6 +23,7 @@ const createEvent = asyncHandler(async (req, res) => {
         totalRevenue: Number(totalRevenue) || 0,
         amountReceived: Number(amountReceived) || 0,
         advanceAmount: Number(advanceAmount) || 0,
+        proformaAmount: Number(proformaAmount) || 0,
         status: status || 'Upcoming'
     });
 
@@ -182,6 +183,12 @@ const updateEvent = asyncHandler(async (req, res) => {
         if (req.body.totalRevenue !== undefined) event.totalRevenue = Number(req.body.totalRevenue);
         if (req.body.amountReceived !== undefined) event.amountReceived = Number(req.body.amountReceived);
         if (req.body.advanceAmount !== undefined) event.advanceAmount = Number(req.body.advanceAmount);
+        if (req.body.proformaAmount !== undefined) event.proformaAmount = Number(req.body.proformaAmount);
+        
+        // Custom Vehicles
+        if (req.body.customVehicles !== undefined) {
+            event.customVehicles = req.body.customVehicles;
+        }
 
         const updatedEvent = await event.save();
         res.json(updatedEvent);
@@ -211,10 +218,73 @@ const deleteEvent = asyncHandler(async (req, res) => {
     }
 });
 
+// @desc    Add a rate card to an event
+// @route   POST /api/admin/events/:id/ratecard
+// @access  Private/Admin
+const addRateCard = asyncHandler(async (req, res) => {
+    const event = await Event.findById(req.params.id);
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+
+    const newRate = {
+        serviceName: req.body.serviceName,
+        vehicleType: req.body.vehicleType || '',
+        vehicleModel: req.body.vehicleModel || '',
+        baseRate: Number(req.body.baseRate) || 0,
+        baseKms: Number(req.body.baseKms) || 0,
+        baseHours: Number(req.body.baseHours) || 0,
+        extraKmRate: Number(req.body.extraKmRate) || 0,
+        extraHourRate: Number(req.body.extraHourRate) || 0,
+        driverAllowance: Number(req.body.driverAllowance) || 0
+    };
+
+    event.rateCard.push(newRate);
+    await event.save();
+    res.status(201).json(event);
+});
+
+// @desc    Update a rate card in an event
+// @route   PUT /api/admin/events/:id/ratecard/:rateId
+// @access  Private/Admin
+const updateRateCard = asyncHandler(async (req, res) => {
+    const event = await Event.findById(req.params.id);
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+
+    const rate = event.rateCard.id(req.params.rateId);
+    if (!rate) return res.status(404).json({ message: 'Rate card not found' });
+
+    if (req.body.serviceName !== undefined) rate.serviceName = req.body.serviceName;
+    if (req.body.vehicleType !== undefined) rate.vehicleType = req.body.vehicleType;
+    if (req.body.vehicleModel !== undefined) rate.vehicleModel = req.body.vehicleModel;
+    if (req.body.baseRate !== undefined) rate.baseRate = Number(req.body.baseRate);
+    if (req.body.baseKms !== undefined) rate.baseKms = Number(req.body.baseKms);
+    if (req.body.baseHours !== undefined) rate.baseHours = Number(req.body.baseHours);
+    if (req.body.extraKmRate !== undefined) rate.extraKmRate = Number(req.body.extraKmRate);
+    if (req.body.extraHourRate !== undefined) rate.extraHourRate = Number(req.body.extraHourRate);
+    if (req.body.driverAllowance !== undefined) rate.driverAllowance = Number(req.body.driverAllowance);
+
+    await event.save();
+    res.json(event);
+});
+
+// @desc    Delete a rate card from an event
+// @route   DELETE /api/admin/events/:id/ratecard/:rateId
+// @access  Private/Admin
+const deleteRateCard = asyncHandler(async (req, res) => {
+    const event = await Event.findById(req.params.id);
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+
+    event.rateCard.pull(req.params.rateId);
+    await event.save();
+    res.json(event);
+});
+
 module.exports = {
     createEvent,
     getEvents,
     getEventDetails,
     updateEvent,
-    deleteEvent
+    deleteEvent,
+    addRateCard,
+    updateRateCard,
+    deleteRateCard
 };

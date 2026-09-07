@@ -34,6 +34,15 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// Prevent browser caching for all API routes so updates reflect instantly without F5
+app.use('/api', (req, res, next) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    res.set('Surrogate-Control', 'no-store');
+    next();
+});
+
 // --- API ROUTES ---
 console.log('--- REQUIRING ROUTES from', __dirname);
 const authRoutes = require('./routes/authRoutes');
@@ -41,15 +50,45 @@ const adminRoutes = require('./routes/adminRoutes');
 console.log('--- ADMIN ROUTES LOADED ---');
 const driverRoutes = require('./routes/driverRoutes');
 const staffRoutes = require('./routes/staffRoutes');
+const driverPerformanceRoutes = require('./routes/driverPerformanceRoutes');
 
 const aiRoutes = require('./routes/aiRoutes');
+const leadRoutes = require('./routes/leadRoutes');
+const bookingRoutes = require('./routes/bookingRoutes');
+const drsRoutes = require('./routes/drsRoutes');
+const clientRoutes = require('./routes/clientRoutes');
+const invoiceRoutes = require('./routes/invoiceRoutes');
 
 app.use('/api/auth', authRoutes);
+
+// --- PROXY FOR PDF IMAGES (NO AUTH) ---
+app.get('/api/admin/proxy-image', async (req, res) => {
+    try {
+        const url = req.query.url;
+        if (!url) return res.status(400).send('URL required');
+        const axios = require('axios');
+        const response = await axios.get(url, { responseType: 'arraybuffer' });
+        res.set('Content-Type', response.headers['content-type']);
+        res.set('Cache-Control', 'public, max-age=31536000');
+        res.set('Access-Control-Allow-Origin', '*');
+        res.send(response.data);
+    } catch (err) {
+        console.error('Proxy Error:', err.message);
+        res.status(500).send('Proxy Error');
+    }
+});
+
 app.use('/api/admin', adminRoutes);
 app.use('/api/driver', driverRoutes);
 app.use('/api/staff', staffRoutes);
+app.use('/api/driver-performance', driverPerformanceRoutes);
 
 app.use('/api/ai', aiRoutes);
+app.use('/api/leads', leadRoutes);
+app.use('/api/bookings', bookingRoutes);
+app.use('/api/drs', drsRoutes);
+app.use('/api/clients', clientRoutes);
+app.use('/api/invoices', invoiceRoutes);
 
 app.get('/api/db-check', async (req, res) => {
     const status = mongoose.connection.readyState;

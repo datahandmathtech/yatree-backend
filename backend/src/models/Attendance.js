@@ -24,6 +24,9 @@ const attendanceSchema = new mongoose.Schema({
         type: String, // format: YYYY-MM-DD for easier querying per day
         required: true
     },
+    guestName: { type: String },
+    dutyType: { type: String },
+    dutyTime: { type: String },
     punchIn: {
         km: { type: Number },
         selfie: { type: String }, // URL from Cloudinary
@@ -66,7 +69,7 @@ const attendanceSchema = new mongoose.Schema({
             amount: { type: Number },
             km: { type: Number },
             slipPhoto: { type: String },
-            fuelType: { type: String, enum: ['Petrol', 'Diesel', 'CNG', 'Other'], default: 'Diesel' },
+            fuelType: { type: String, enum: ['Petrol', 'Diesel', 'CNG', 'Electric', 'Other'], default: 'Diesel' },
             paymentSource: { type: String, enum: ['Office', 'Guest', 'Main Office'], default: 'Office' }
         }],
         km: { type: Number }, // Legacy/Single entry fallback
@@ -102,8 +105,8 @@ const attendanceSchema = new mongoose.Schema({
         default: 1
     },
     pendingExpenses: [{
-        type: { type: String, enum: ['fuel', 'parking', 'other', 'wash', 'puncture', 'tissue', 'water', 'special_pay'] },
-        fuelType: { type: String }, // NEW: Petrol, Diesel, CNG
+        type: { type: String },
+        fuelType: { type: String }, // NEW: Petrol, Diesel, CNG, Electric
         amount: { type: Number },
         quantity: { type: Number, default: 0 }, // Liters
         rate: { type: Number, default: 0 }, // ₹/L
@@ -112,7 +115,27 @@ const attendanceSchema = new mongoose.Schema({
         paymentSource: { type: String, enum: ['Office', 'Guest', 'Main Office'], default: 'Office' },
         status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
         createdAt: { type: Date, default: Date.now }
-    }]
+    }],
+    // Advanced Billing
+    billingDetails: {
+        serviceName: { type: String },
+        baseRate: { type: Number, default: 0 },
+        baseKms: { type: Number, default: 0 },
+        baseHours: { type: Number, default: 0 },
+        extraKmRate: { type: Number, default: 0 },
+        extraHourRate: { type: Number, default: 0 },
+        driverAllowanceRate: { type: Number, default: 0 },
+        
+        // Calculated post-duty
+        actualKms: { type: Number, default: 0 },
+        actualHours: { type: Number, default: 0 },
+        extraKms: { type: Number, default: 0 },
+        extraHours: { type: Number, default: 0 },
+        extraKmAmount: { type: Number, default: 0 },
+        extraHourAmount: { type: Number, default: 0 },
+        driverAllowanceAmount: { type: Number, default: 0 },
+        totalBilledAmount: { type: Number, default: 0 }
+    }
 }, { timestamps: true });
 
 // Index for faster querying
@@ -120,5 +143,6 @@ attendanceSchema.index({ driver: 1, date: 1 });
 attendanceSchema.index({ company: 1, date: 1 });
 attendanceSchema.index({ date: 1 });
 attendanceSchema.index({ vehicle: 1, status: 1, date: -1 });
+attendanceSchema.index({ eventId: 1 });
 
 module.exports = mongoose.model('Attendance', attendanceSchema);

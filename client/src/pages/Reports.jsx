@@ -145,6 +145,16 @@ const ActionBtns = ({ onView, onEdit, onDelete }) => (
 /* ─── TableSection ─── */
 const TableSection = ({ tabId, rows, headers, chips, fromDate, toDate, colSummaries, empty }) => {
     const cfg = TAB_CONFIG[tabId] || { label: tabId, color: '#fff', bg: 'rgba(255,255,255,0.05)', icon: FileText };
+    const [page, setPage] = useState(1);
+    const pageSize = 50;
+
+    useEffect(() => {
+        setPage(1);
+    }, [tabId, rows?.length]);
+
+    const totalPages = Math.ceil((rows?.length || 0) / pageSize);
+    const paginatedRows = rows?.slice((page - 1) * pageSize, page * pageSize);
+
     return (
         <div style={{ background: 'rgba(15,23,42,0.8)', border: `1px solid ${cfg.color || '#fff'}20`, borderRadius: '20px', overflow: 'hidden', marginBottom: '28px' }}>
             <SectionBanner tabId={tabId} count={rows?.length || 0} chips={chips} fromDate={fromDate} toDate={toDate} />
@@ -183,11 +193,30 @@ const TableSection = ({ tabId, rows, headers, chips, fromDate, toDate, colSummar
                     <tbody>
                         {rows?.length === 0
                             ? <tr><td colSpan={headers.length} style={{ padding: '50px', textAlign: 'center', color: 'rgba(231, 25, 25, 0.2)', fontSize: '13px' }}>{empty || 'No records found.'}</td></tr>
-                            : rows
+                            : paginatedRows
                         }
                     </tbody>
                 </table>
             </div>
+            {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', padding: '15px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    <button 
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                        disabled={page === 1}
+                        style={{ padding: '6px 12px', background: 'rgba(255,255,255,0.05)', color: page === 1 ? 'rgba(255,255,255,0.2)' : 'white', border: 'none', borderRadius: '6px', cursor: page === 1 ? 'not-allowed' : 'pointer' }}
+                    >
+                        Prev
+                    </button>
+                    <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: '800' }}>Page {page} of {totalPages}</span>
+                    <button 
+                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                        disabled={page === totalPages}
+                        style={{ padding: '6px 12px', background: 'rgba(255,255,255,0.05)', color: page === totalPages ? 'rgba(255,255,255,0.2)' : 'white', border: 'none', borderRadius: '6px', cursor: page === totalPages ? 'not-allowed' : 'pointer' }}
+                    >
+                        Next
+                    </button>
+                </div>
+            )}
         </div>
     );
 };
@@ -708,10 +737,10 @@ const Reports = ({ isSubComponent = false }) => {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
                             <div
                                 onClick={() => {
-                                    const remarks = (r.punchOut?.remarks && r.punchOut.remarks !== 'Manual Entry' ? r.punchOut.remarks : '') + (r.punchOut?.otherRemarks ? (r.punchOut.remarks && r.punchOut.remarks !== 'Manual Entry' ? ' | ' : '') + r.punchOut.otherRemarks : '') || r.remarks || 'No remarks recorded';
+                                    const remarks = r.punchOut?.otherRemarks || (r.punchOut?.remarks && r.punchOut.remarks !== 'Manual Entry' ? r.punchOut.remarks : '') || r.remarks || 'No remarks recorded';
                                     setRemarkPopup({ name: r.driver?.name || 'Driver', remarks });
                                 }}
-                                title={(r.punchOut?.remarks && r.punchOut.remarks !== 'Manual Entry' ? r.punchOut.remarks : '') + (r.punchOut?.otherRemarks ? (r.punchOut.remarks && r.punchOut.remarks !== 'Manual Entry' ? ' | ' : '') + r.punchOut.otherRemarks : '') || r.remarks || 'View Remarks'}
+                                title={r.punchOut?.otherRemarks || (r.punchOut?.remarks && r.punchOut.remarks !== 'Manual Entry' ? r.punchOut.remarks : '') || r.remarks || 'View Remarks'}
                                 style={{ width: '32px', height: '32px', borderRadius: '9px', background: 'rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'center', alignItems: 'center', flexShrink: 0, cursor: 'pointer' }}
                             >
                                 <UserIcon size={15} color={((r.punchOut?.remarks && r.punchOut.remarks !== 'Manual Entry') || r.punchOut?.otherRemarks || (r.remarks && r.remarks !== 'Manual Entry')) ? '#10b981' : '#38bdf8'} />
@@ -744,7 +773,7 @@ const Reports = ({ isSubComponent = false }) => {
                     </TD>
                     <TD>
                         {fuelAmt > 0
-                            ? <div><span style={{ color: 'var(--primary)', fontWeight: '900', fontSize: '13px' }}>₹{fuelAmt}</span><div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.25)' }}>{(r.fuel?.entries?.length || 1)} fill</div></div>
+                            ? <div><span style={{ color: 'var(--primary)', fontWeight: '900', fontSize: '13px' }}>₹{Math.round(fuelAmt)}</span><div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.25)' }}>{(r.fuel?.entries?.length || 1)} fill</div></div>
                             : <span style={{ color: 'rgba(255,255,255,0.15)' }}>—</span>}
                     </TD>
 

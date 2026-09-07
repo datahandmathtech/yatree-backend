@@ -26,11 +26,12 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useCompany } from '../context/CompanyContext';
-import { useLanguage } from '../context/LanguageContext';
+import { useLanguage, translations } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 
 const NavItem = ({ item, onClick, isSubItem = false }) => {
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
+    const displayText = (item.labelKey && translations[language]?.[item.labelKey]) ? t(item.labelKey) : item.label;
     return (
         <NavLink
             to={item.path}
@@ -53,13 +54,14 @@ const NavItem = ({ item, onClick, isSubItem = false }) => {
             })}
         >
             {item.icon && <item.icon size={isSubItem ? 18 : 20} />}
-            <span style={{ fontWeight: '600', fontSize: isSubItem ? '14px' : '15px' }}>{t(item.labelKey) || item.label}</span>
+            <span style={{ fontWeight: '600', fontSize: isSubItem ? '14px' : '15px' }}>{displayText}</span>
         </NavLink>
     );
 };
 
 const NavGroup = ({ title, labelKey, icon: Icon, children, isOpen, onToggle }) => {
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
+    const displayTitle = (labelKey && translations[language]?.[labelKey]) ? t(labelKey) : title;
     return (
         <div style={{ marginBottom: '6px' }}>
             <button
@@ -80,7 +82,7 @@ const NavGroup = ({ title, labelKey, icon: Icon, children, isOpen, onToggle }) =
             >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <Icon size={20} />
-                    <span style={{ fontWeight: '700', fontSize: '15px' }}>{t(labelKey) || title}</span>
+                    <span style={{ fontWeight: '700', fontSize: '15px' }}>{displayTitle}</span>
                 </div>
                 <motion.div
                     animate={{ rotate: isOpen ? 180 : 0 }}
@@ -125,7 +127,8 @@ const Sidebar = ({ isOpen, onClose }) => {
         buysell: location.pathname.includes('/admin/outside-cars') || location.pathname.includes('/admin/event-management'),
         maintenance: location.pathname.includes('/admin/maintenance') || location.pathname.includes('/admin/vehicle-month-details') || location.pathname.includes('/admin/vehicles') || location.pathname.includes('/admin/accident-logs') || location.pathname.includes('/admin/warranties'),
         vehicles: location.pathname.includes('/admin/fuel') || location.pathname.includes('/admin/border-tax') || location.pathname.includes('/admin/fastag') || location.pathname.includes('/admin/parking') || location.pathname.includes('/admin/driver-services') || location.pathname.includes('/admin/border-tax') || location.pathname.includes('/admin/fastag') || location.pathname.includes('/admin/accident-logs') || location.pathname.includes('/admin/warranties'),
-        logbook: location.pathname.includes('/admin/log-book')
+        logbook: location.pathname.includes('/admin/log-book'),
+        bookings: location.pathname.includes('/admin/leads') || location.pathname.includes('/admin/bookings') || location.pathname.includes('/admin/drs') || location.pathname.includes('/admin/client-ledgers') || location.pathname.includes('/admin/invoices'),
     });
 
     const toggleGroup = (group) => {
@@ -288,9 +291,19 @@ const Sidebar = ({ isOpen, onClose }) => {
                     <NavItem item={{ path: '/admin/log-book', icon: ClipboardList, label: 'Log Book', labelKey: 'log_book' }} onClick={onClose} />
                 )}
 
+
+
+                <NavGroup title="Bookings & Leads" labelKey="bookings_leads" icon={Briefcase} isOpen={openGroups.bookings} onToggle={() => toggleGroup('bookings')}>
+                    <NavItem item={{ path: '/admin/leads', label: 'Sales Leads', labelKey: 'leads' }} onClick={onClose} isSubItem />
+                    <NavItem item={{ path: '/admin/bookings', label: 'Confirmed Bookings', labelKey: 'bookings' }} onClick={onClose} isSubItem />
+                    <NavItem item={{ path: '/admin/drs', label: 'DRS Schedule', labelKey: 'drs' }} onClick={onClose} isSubItem />
+                    <NavItem item={{ path: '/admin/client-ledgers', label: 'Client Ledgers', labelKey: 'client_ledgers' }} onClick={onClose} isSubItem />
+                    <NavItem item={{ path: '/admin/invoices', label: 'Tax Invoices', labelKey: 'tax_invoices' }} onClick={onClose} isSubItem />
+                </NavGroup>
+
                 {hasAccess('driversService') && (
                     <NavGroup title="Drivers Services" labelKey="drivers_services" icon={Users} isOpen={openGroups.drivers} onToggle={() => toggleGroup('drivers')}>
-                        {hasAccess('driversService', 'drivers') && <NavItem item={{ path: '/admin/drivers-panel', label: 'Drivers', labelKey: 'drivers' }} onClick={onClose} isSubItem />}
+                        {hasAccess('driversService', 'drivers') && <NavItem item={{ path: '/admin/drivers-panel', label: 'Taxi Drivers', labelKey: 'drivers' }} onClick={onClose} isSubItem />}
 
                         {hasAccess('driversService', 'freelancers') && <NavItem item={{ path: '/admin/freelancers', label: 'Freelancers', labelKey: 'freelancers' }} onClick={onClose} isSubItem />}
                         {hasAccess('driversService', 'parking') && <NavItem item={{ path: '/admin/parking', label: 'Parking', labelKey: 'parking' }} onClick={onClose} isSubItem />}
@@ -374,9 +387,11 @@ const Sidebar = ({ isOpen, onClose }) => {
                                             alt="Logo"
                                             style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '4px' }}
                                             onError={(e) => {
-                                                e.target.style.display = 'none';
-                                                e.target.parentElement.innerText = user?.name?.charAt(0) || 'A';
-                                                e.target.parentElement.style.background = `linear-gradient(135deg, ${theme.primary}, ${theme.secondary || theme.primary})`;
+                                                const parent = e.target.parentElement;
+                                                if (parent) {
+                                                    parent.innerText = user?.name?.charAt(0) || 'A';
+                                                    parent.style.background = `linear-gradient(135deg, ${theme.primary}, ${theme.secondary || theme.primary})`;
+                                                }
                                             }}
                                         />
                                     ) : (

@@ -6,7 +6,6 @@ const Parking = require('../models/Parking');
 const Loan = require('../models/Loan');
 const Allowance = require('../models/Allowance');
 const { DateTime } = require('luxon');
-const { syncVehicleOdometer } = require('../utils/odometerUtils');
 const DASHBOARD_CACHE = require('../utils/cache');
 
 // Helper to get current date in IST (format: YYYY-MM-DD)
@@ -211,8 +210,9 @@ const punchIn = async (req, res) => {
 
         // Update vehicle status
         vehicle.currentDriver = driver._id;
-        // Update vehicle odometer
-        await syncVehicleOdometer(vehicleId);
+        if (Number(km) > (vehicle.lastOdometer || 0)) {
+            vehicle.lastOdometer = Number(km);
+        }
         await vehicle.save();
 
         driver.tripStatus = 'active';
@@ -392,14 +392,34 @@ const punchOut = async (req, res) => {
         const allowanceTAAmount = tripTypes.includes('Same Day') ? (driver.sameDayReturnBonus !== undefined ? driver.sameDayReturnBonus : 100) : 0;
         const nightStayAmount = tripTypes.includes('Night Stay') ? (driver.nightStayBonus !== undefined ? driver.nightStayBonus : 0) : 0;
 
-        attendance.punchOut.allowanceTA = allowanceTAAmount;
-        attendance.punchOut.nightStayAmount = nightStayAmount;
+        attendance.punchOut.allowanceTA = 0;
+        attendance.punchOut.nightStayAmount = 0;
 
         attendance.outsideTrip = {
             occurred: outsideTripOccurred === 'true',
             tripType: outsideTripType || null,
-            bonusAmount: allowanceTAAmount + nightStayAmount
+            bonusAmount: 0
         };
+
+        if (!attendance.pendingExpenses) attendance.pendingExpenses = [];
+        
+        if (allowanceTAAmount > 0) {
+            attendance.pendingExpenses.push({
+                type: 'allowance_ta',
+                amount: allowanceTAAmount,
+                status: 'pending',
+                createdAt: new Date()
+            });
+        }
+        
+        if (nightStayAmount > 0) {
+            attendance.pendingExpenses.push({
+                type: 'allowance_night',
+                amount: nightStayAmount,
+                status: 'pending',
+                createdAt: new Date()
+            });
+        }
 
         // Calculate Total KM
         const totalKM = Number(km) - attendance.punchIn.km;
@@ -427,7 +447,9 @@ const punchOut = async (req, res) => {
             const vehicle = await Vehicle.findById(attendance.vehicle);
             if (vehicle) {
                 vehicle.currentDriver = null;
-                await syncVehicleOdometer(attendance.vehicle);
+                if (Number(km) > (vehicle.lastOdometer || 0)) {
+                    vehicle.lastOdometer = Number(km);
+                }
                 await vehicle.save();
             }
         }
@@ -852,3 +874,47 @@ module.exports = {
     getDriverLedger,
     updatePassword
 };
+
+
+// @desc    Record tire air check for assigned vehicle
+// @route   POST /api/driver/vehicle/air-check
+// @access  Private/Driver
+const recordAirCheck = async (req, res) => {
+    try {
+        const driver = await User.findById(req.user._id).populate("assignedVehicle");
+        
+        // Find which vehicle the driver is actually driving right now
+        const activePunch = await Attendance.findOne({ driver: req.user._id, status: 'incomplete' });
+        
+        let vehicleIdToUpdate = null;
+        if (activePunch && activePunch.vehicle) {
+            vehicleIdToUpdate = activePunch.vehicle;
+        } else if (driver && driver.assignedVehicle) {
+            vehicleIdToUpdate = driver.assignedVehicle._id;
+        }
+
+        if (!vehicleIdToUpdate) {
+            return res.status(400).json({ message: "No active vehicle found. Please punch in first." });
+        }
+
+        const vehicle = await Vehicle.findById(vehicleIdToUpdate);
+        if (!vehicle) {
+            return res.status(404).json({ message: "Vehicle not found" });
+        }
+
+        vehicle.lastAirCheckDate = new Date();
+        vehicle.lastAirCheckedBy = req.user._id;
+        await vehicle.save();
+
+        // Clear dashboard cache so the Admin sees the alert disappear instantly
+        DASHBOARD_CACHE.clear();
+
+        res.status(200).json({ success: true, message: "Air check recorded successfully" });
+    } catch (error) {
+        console.error('AirCheck error:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+module.exports.recordAirCheck = recordAirCheck;
+
