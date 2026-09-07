@@ -299,3 +299,105 @@
     at E:\New folder\Master-Server\TEXI\yatree-backend\src\app.js:127:16
     at Layer.handle [as handle_request] (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\layer.js:95:5)
     at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\route.js:149:13)
+[2026-09-07T08:08:48.383Z] CRON: Cron Jobs Initialized
+[2026-09-07T08:10:43.813Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-09-07T08:10:43.843Z] GLOBAL_ERROR: Not Found - /api/leads/company/698ac8b01587e01651a49443 - Stack: Error: Not Found - /api/leads/company/698ac8b01587e01651a49443
+    at notFound (E:\New folder\Master-Server\TEXI\yatree-backend\src\middleware\errorMiddleware.js:2:19)
+    at Layer.handle [as handle_request] (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\layer.js:95:5)
+    at trim_prefix (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:328:13)
+    at E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:286:9
+    at Function.process_params (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:346:12)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:280:10)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\route.js:141:14)
+    at E:\New folder\Master-Server\TEXI\yatree-backend\src\app.js:127:16
+    at Layer.handle [as handle_request] (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\layer.js:95:5)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\route.js:149:13)
+[2026-09-07T08:10:49.964Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-09-07T08:10:49.990Z] GLOBAL_ERROR: Not Found - /api/leads/company/698ac8b01587e01651a49443 - Stack: Error: Not Found - /api/leads/company/698ac8b01587e01651a49443
+    at notFound (E:\New folder\Master-Server\TEXI\yatree-backend\src\middleware\errorMiddleware.js:2:19)
+    at Layer.handle [as handle_request] (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\layer.js:95:5)
+    at trim_prefix (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:328:13)
+    at E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:286:9
+    at Function.process_params (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:346:12)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:280:10)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\route.js:141:14)
+    at E:\New folder\Master-Server\TEXI\yatree-backend\src\app.js:127:16
+    at Layer.handle [as handle_request] (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\layer.js:95:5)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\route.js:149:13)
+[2026-09-07T08:10:51.258Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-09-07T08:10:51.275Z] GLOBAL_ERROR: Not Found - /api/leads/company/698ac8b01587e01651a49443 - Stack: Error: Not Found - /api/leads/company/698ac8b01587e01651a49443
+    at notFound (E:\New folder\Master-Server\TEXI\yatree-backend\src\middleware\errorMiddleware.js:2:19)
+    at Layer.handle [as handle_request] (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\layer.js:95:5)
+    at trim_prefix (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:328:13)
+    at E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:286:9
+    at Function.process_params (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:346:12)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:280:10)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\route.js:141:14)
+    at E:\New folder\Master-Server\TEXI\yatree-backend\src\app.js:127:16
+    at Layer.handle [as handle_request] (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\layer.js:95:5)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\route.js:149:13)
+[2026-09-07T08:10:51.733Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-09-07T08:10:51.755Z] GLOBAL_ERROR: Not Found - /api/leads/company/698ac8b01587e01651a49443 - Stack: Error: Not Found - /api/leads/company/698ac8b01587e01651a49443
+    at notFound (E:\New folder\Master-Server\TEXI\yatree-backend\src\middleware\errorMiddleware.js:2:19)
+    at Layer.handle [as handle_request] (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\layer.js:95:5)
+    at trim_prefix (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:328:13)
+    at E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:286:9
+    at Function.process_params (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:346:12)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:280:10)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\route.js:141:14)
+    at E:\New folder\Master-Server\TEXI\yatree-backend\src\app.js:127:16
+    at Layer.handle [as handle_request] (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\layer.js:95:5)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\route.js:149:13)
+[2026-09-07T08:10:52.311Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-09-07T08:10:52.360Z] GLOBAL_ERROR: Not Found - /api/leads/company/698ac8b01587e01651a49443 - Stack: Error: Not Found - /api/leads/company/698ac8b01587e01651a49443
+    at notFound (E:\New folder\Master-Server\TEXI\yatree-backend\src\middleware\errorMiddleware.js:2:19)
+    at Layer.handle [as handle_request] (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\layer.js:95:5)
+    at trim_prefix (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:328:13)
+    at E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:286:9
+    at Function.process_params (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:346:12)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:280:10)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\route.js:141:14)
+    at E:\New folder\Master-Server\TEXI\yatree-backend\src\app.js:127:16
+    at Layer.handle [as handle_request] (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\layer.js:95:5)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\route.js:149:13)
+[2026-09-07T08:11:23.407Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-09-07T08:11:23.430Z] GLOBAL_ERROR: Not Found - /api/leads/company/698ac8b01587e01651a49443 - Stack: Error: Not Found - /api/leads/company/698ac8b01587e01651a49443
+    at notFound (E:\New folder\Master-Server\TEXI\yatree-backend\src\middleware\errorMiddleware.js:2:19)
+    at Layer.handle [as handle_request] (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\layer.js:95:5)
+    at trim_prefix (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:328:13)
+    at E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:286:9
+    at Function.process_params (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:346:12)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:280:10)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\route.js:141:14)
+    at E:\New folder\Master-Server\TEXI\yatree-backend\src\app.js:127:16
+    at Layer.handle [as handle_request] (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\layer.js:95:5)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\route.js:149:13)
+[2026-09-07T08:11:26.472Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-09-07T08:11:26.504Z] GLOBAL_ERROR: Not Found - /api/leads/company/698ac8b01587e01651a49443 - Stack: Error: Not Found - /api/leads/company/698ac8b01587e01651a49443
+    at notFound (E:\New folder\Master-Server\TEXI\yatree-backend\src\middleware\errorMiddleware.js:2:19)
+    at Layer.handle [as handle_request] (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\layer.js:95:5)
+    at trim_prefix (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:328:13)
+    at E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:286:9
+    at Function.process_params (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:346:12)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:280:10)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\route.js:141:14)
+    at E:\New folder\Master-Server\TEXI\yatree-backend\src\app.js:127:16
+    at Layer.handle [as handle_request] (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\layer.js:95:5)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\route.js:149:13)
+[2026-09-07T08:11:27.671Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-09-07T08:11:27.707Z] GLOBAL_ERROR: Not Found - /api/leads/company/698ac8b01587e01651a49443 - Stack: Error: Not Found - /api/leads/company/698ac8b01587e01651a49443
+    at notFound (E:\New folder\Master-Server\TEXI\yatree-backend\src\middleware\errorMiddleware.js:2:19)
+    at Layer.handle [as handle_request] (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\layer.js:95:5)
+    at trim_prefix (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:328:13)
+    at E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:286:9
+    at Function.process_params (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:346:12)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:280:10)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\route.js:141:14)
+    at E:\New folder\Master-Server\TEXI\yatree-backend\src\app.js:127:16
+    at Layer.handle [as handle_request] (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\layer.js:95:5)
+    at next (E:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\route.js:149:13)
+[2026-09-07T08:18:38.498Z] CRON: Cron Jobs Initialized
+[2026-09-07T08:18:54.967Z] CRON: Cron Jobs Initialized
+[2026-09-07T08:19:02.909Z] CRON: Cron Jobs Initialized
+[2026-09-07T08:19:09.693Z] CRON: Cron Jobs Initialized
+[2026-09-07T08:25:32.374Z] CRON: Cron Jobs Initialized
