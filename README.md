@@ -33,3 +33,10 @@
 - **Validation**: Prevents double punch-in/out per day.
 - **Camera Only**: Frontend should restrict gallery access. Backend validates that a photo is present.
 - **Isolation**: Data is filtered by `companyId`.
+
+## LogKaro Enterprise Modules (Updated: 2026-09-07)
+- **Leads Management**: Auto-numbered quotations (LK-QT-xxxx), direct WhatsApp share, quotation PDF.
+- **Bookings Engine**: Auto-booking ID (LK-BK-xxxx), advance tracking, passenger details, booking confirmation PDF.
+- **Daily Running Sheets (DRS)**: Auto DRS ID (LK-DRS-xxxx), start/end KM, toll/parking, driver & fuel advances, WhatsApp duty slip.
+- **Client Ledgers & Cashbooks**: Trip-wise debit/credit, transaction statements, running balance.
+- **Tax Invoices**: SAC code 996601, GST calculations (CGST+SGST / IGST), branded PDF with QR code & bank details.
