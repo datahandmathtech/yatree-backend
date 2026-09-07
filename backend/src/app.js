@@ -120,7 +120,14 @@ app.use('/assets', express.static(path.join(finalPath, 'assets'), {
 // Serve all other static files from dist root (logos, icons, manifest.json)
 app.use(express.static(finalPath, {
     maxAge: '1d',
-    etag: true
+    etag: true,
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+        }
+    }
 }));
 
 // Catch-all for React/Vite routing
@@ -136,6 +143,8 @@ app.get('*', (req, res, next) => {
     }
 
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.sendFile(path.join(finalPath, 'index.html'), (err) => {
         if (err) {
             res.status(500).send('<h1>Server is Live</h1><p>Frontend files are not found in the dist folder. Please check deployment.</p>');
