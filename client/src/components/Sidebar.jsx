@@ -294,7 +294,7 @@ const Sidebar = ({ isOpen, onClose }) => {
 
 
                 <NavGroup title="Bookings & Leads" labelKey="bookings_leads" icon={Briefcase} isOpen={openGroups.bookings} onToggle={() => toggleGroup('bookings')}>
-                    <NavItem item={{ path: '/admin/leads', label: 'Sales Leads', labelKey: 'leads' }} onClick={onClose} isSubItem />
+                    <NavItem item={{ path: '/admin/leads', icon: Car, label: 'Book A Ride' }} onClick={onClose} isSubItem />
                     <NavItem item={{ path: '/admin/bookings', label: 'Confirmed Bookings', labelKey: 'bookings' }} onClick={onClose} isSubItem />
                     <NavItem item={{ path: '/admin/drs', label: 'DRS Schedule', labelKey: 'drs' }} onClick={onClose} isSubItem />
                     <NavItem item={{ path: '/admin/client-ledgers', label: 'Client Ledgers', labelKey: 'client_ledgers' }} onClick={onClose} isSubItem />
