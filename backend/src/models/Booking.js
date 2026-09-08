@@ -24,6 +24,10 @@ const bookingSchema = new mongoose.Schema({
         unique: true,
         index: true
     },
+    clientCode: {
+        type: String,
+        index: true
+    },
     company: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Company',

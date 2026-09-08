@@ -34,7 +34,32 @@ const getNextSequence = async (prefix = 'LK', pad = 5) => {
     return `${prefix}-${year}-${seqStr}`;
 };
 
+/**
+ * Generates month-wise client code for leads:
+ * e.g., April: 04/01, 04/02, 04/03...
+ * May: 05/01, 05/02...
+ * Key format: CLIENT_CODE-${companyId}-${year}-${monthStr}
+ */
+const getNextClientCode = async (companyId, date = new Date()) => {
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const monthNum = d.getMonth() + 1;
+    const monthStr = String(monthNum).padStart(2, '0');
+    const compKey = companyId ? String(companyId) : 'DEFAULT';
+    const key = `CLIENT_CODE-${compKey}-${year}-${monthStr}`;
+
+    const ret = await Sequence.findOneAndUpdate(
+        { id: key },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+    );
+
+    const seqStr = String(ret.seq).padStart(2, '0');
+    return `${monthStr}/${seqStr}`;
+};
+
 module.exports = {
     Sequence,
-    getNextSequence
+    getNextSequence,
+    getNextClientCode
 };

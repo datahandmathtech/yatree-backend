@@ -4,18 +4,26 @@ const Booking = require('../models/Booking');
 const Client = require('../models/Client');
 const LedgerEntry = require('../models/LedgerEntry');
 const Company = require('../models/Company');
-const { getNextSequence } = require('../models/Sequence');
+const { getNextSequence, getNextClientCode } = require('../models/Sequence');
 const asyncHandler = require('express-async-handler');
 
 // @desc    Get all leads for a company
 // @route   GET /api/leads/:companyId
 // @access  Private/AdminOrExecutive
 const getLeads = asyncHandler(async (req, res) => {
-    const { status, search } = req.query;
+    const { status, search, month, salesPerson, source } = req.query;
     let query = { company: req.params.companyId };
 
     if (status && status !== 'All') {
         query.status = status;
+    }
+
+    if (source && source !== 'All') {
+        query.source = source;
+    }
+
+    if (salesPerson && salesPerson !== 'All') {
+        query.salesPerson = salesPerson;
     }
 
     if (search) {
@@ -23,11 +31,28 @@ const getLeads = asyncHandler(async (req, res) => {
             { clientName: { $regex: search, $options: 'i' } },
             { mobileNumber: { $regex: search, $options: 'i' } },
             { leadId: { $regex: search, $options: 'i' } },
+            { clientCode: { $regex: search, $options: 'i' } },
             { source: { $regex: search, $options: 'i' } }
         ];
     }
 
-    const leads = await Lead.find(query).sort({ createdAt: -1 });
+    let leads = await Lead.find(query).sort({ createdAt: -1 });
+
+    // Month filter (e.g. 'Apr', 'May', '04', '05')
+    if (month && month !== 'All') {
+        const MONTH_MAP = {
+            'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 'May': '05', 'Jun': '06',
+            'Jul': '07', 'Aug': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+        };
+        const mStr = MONTH_MAP[month] || month;
+        leads = leads.filter(lead => {
+            if (lead.clientCode && lead.clientCode.startsWith(mStr + '/')) return true;
+            const d = new Date(lead.leadDate || lead.createdAt);
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            return m === mStr;
+        });
+    }
+
     res.json(leads);
 });
 
@@ -82,7 +107,9 @@ const createLead = asyncHandler(async (req, res) => {
         carType, numberOfCars, itinerary, extraCharges, totalAmount, gstMode, notes
     } = req.body;
 
-    const leadId = await getNextSequence('LK-LEAD');
+    const leadDateObj = leadDate ? new Date(leadDate) : new Date();
+    const clientCode = await getNextClientCode(company, leadDateObj);
+    const leadId = clientCode;
 
     // Ensure itinerary items have proper default fields
     const formattedItinerary = (itinerary || []).map((day, idx) => ({
@@ -103,6 +130,7 @@ const createLead = asyncHandler(async (req, res) => {
     }));
 
     const lead = await Lead.create({
+        clientCode,
         leadId,
         company,
         clientName,
@@ -303,6 +331,7 @@ const convertToBooking = asyncHandler(async (req, res) => {
     // 5. Create the Booking document
     const booking = await Booking.create({
         bookingId,
+        clientCode: lead.clientCode || lead.leadId,
         company: lead.company,
         lead: lead._id,
         client: client._id,

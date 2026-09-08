@@ -438,3 +438,30 @@
 [2026-09-07T11:51:01.251Z] CRON: Cron Jobs Initialized
 [2026-09-07T11:51:19.174Z] CRON: Cron Jobs Initialized
 [2026-09-07T11:51:24.598Z] CRON: Cron Jobs Initialized
+[2026-09-08T08:36:16.706Z] CRON: Cron Jobs Initialized
+[2026-09-08T08:36:31.338Z] Login attempt started
+[2026-09-08T08:36:31.340Z] Login request for: Kavishuser1
+[2026-09-08T08:36:31.476Z] User found: Yatree (Role: Admin)
+[2026-09-08T08:36:31.578Z] Match debug: receivedPwdLen=12, dbHashStart=$2a$10$SZI, isMatch=false
+[2026-09-08T08:36:31.579Z] Invalid credentials
+[2026-09-08T08:36:33.066Z] Login attempt started
+[2026-09-08T08:36:33.068Z] Login request for: Kavishuser1
+[2026-09-08T08:36:33.270Z] User found: Yatree (Role: Admin)
+[2026-09-08T08:36:33.377Z] Match debug: receivedPwdLen=12, dbHashStart=$2a$10$SZI, isMatch=false
+[2026-09-08T08:36:33.378Z] Invalid credentials
+[2026-09-08T08:36:40.507Z] Login attempt started
+[2026-09-08T08:36:40.509Z] Login request for: Kavishuser1
+[2026-09-08T08:36:40.847Z] User found: Yatree (Role: Admin)
+[2026-09-08T08:36:40.950Z] Match debug: receivedPwdLen=11, dbHashStart=$2a$10$SZI, isMatch=true
+[2026-09-08T08:36:40.951Z] Password matched
+[2026-09-08T08:36:40.952Z] DEBUG: Company status in DB is: "active" (Normalized: "active")
+[2026-09-08T08:42:04.257Z] CRON: Cron Jobs Initialized
+[2026-09-08T08:42:15.116Z] CRON: Cron Jobs Initialized
+[2026-09-08T08:42:44.869Z] CRON: Cron Jobs Initialized
+[2026-09-08T08:43:01.979Z] CRON: Cron Jobs Initialized
+[2026-09-08T08:43:15.349Z] CRON: Cron Jobs Initialized
+[2026-09-08T08:43:22.551Z] CRON: Cron Jobs Initialized
+[2026-09-08T08:45:34.286Z] CRON: Cron Jobs Initialized
+[2026-09-08T08:45:59.988Z] CRON: Cron Jobs Initialized
+[2026-09-08T08:46:08.889Z] CRON: Cron Jobs Initialized
+[2026-09-08T08:51:46.756Z] CRON: Cron Jobs Initialized

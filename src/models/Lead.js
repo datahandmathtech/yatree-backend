@@ -23,6 +23,10 @@ const extraChargeSchema = new mongoose.Schema({
 });
 
 const leadSchema = new mongoose.Schema({
+    clientCode: {
+        type: String,
+        index: true
+    },
     leadId: {
         type: String,
         index: true

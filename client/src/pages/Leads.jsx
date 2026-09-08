@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useCompany } from '../context/CompanyContext';
 import { useTheme } from '../context/ThemeContext';
 import axios from '../api/axios';
 import {
     Plus, Edit, Trash2, FileText, CheckCircle, X, Download, Briefcase,
     Calendar, Car, IndianRupee, MapPin, Search, Filter, AlertTriangle,
-    Clock, Phone, ShieldCheck, Share2, HelpCircle
+    Clock, Phone, ShieldCheck, Share2, HelpCircle, User, Users,
+    Globe, Building2, Repeat, CircleDot, XCircle, ChevronLeft, ChevronRight,
+    TrendingUp, BarChart2, BarChart3
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import jsPDF from 'jspdf';
@@ -22,6 +24,13 @@ const GST_MODES = ['GST Inclusive', 'GST Extra', 'No GST', 'RCM'];
 
 const LEAD_STATUSES = ['New', 'Follow-up', 'Quoted', 'Negotiation', 'Confirmed', 'Lost', 'Cancelled'];
 
+const MONTH_TABS = ['All', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
+
+const MONTH_MAP = {
+    'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 'May': '05', 'Jun': '06',
+    'Jul': '07', 'Aug': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+};
+
 export default function Leads() {
     const { selectedCompany } = useCompany();
     const { theme } = useTheme();
@@ -30,6 +39,16 @@ export default function Leads() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
+    const [monthFilter, setMonthFilter] = useState('All');
+    const [sourceFilter, setSourceFilter] = useState('All');
+    const [salesPersonFilter, setSalesPersonFilter] = useState('All');
+
+    // Hover tooltip state
+    const [hoveredLeadId, setHoveredLeadId] = useState(null);
+
+    // Pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 8;
 
     // Create / Edit Modal
     const [showModal, setShowModal] = useState(false);
@@ -74,12 +93,15 @@ export default function Leads() {
         if (selectedCompany?._id) {
             fetchLeads();
         }
-    }, [selectedCompany, statusFilter]);
+    }, [selectedCompany, statusFilter, monthFilter]);
 
     const fetchLeads = async () => {
         try {
             setLoading(true);
             let url = `/api/leads/${selectedCompany._id}?status=${statusFilter}`;
+            if (monthFilter && monthFilter !== 'All') {
+                url += `&month=${monthFilter}`;
+            }
             if (searchTerm) {
                 url += `&search=${encodeURIComponent(searchTerm)}`;
             }
@@ -108,13 +130,9 @@ export default function Leads() {
             phoneDebounceRef.current = setTimeout(async () => {
                 try {
                     const { data } = await axios.get(`/api/leads/check-phone/${selectedCompany._id}?phone=${val.trim()}`);
-                    if (data.exists) {
-                        setPhoneCheckResult(data);
-                    } else {
-                        setPhoneCheckResult(null);
-                    }
+                    setPhoneCheckResult(data);
                 } catch (err) {
-                    console.error('Phone check error:', err);
+                    console.error('Phone duplicate check error:', err);
                 }
             }, 500);
         } else {
@@ -122,13 +140,64 @@ export default function Leads() {
         }
     };
 
+    // Itinerary builders
+    const handleItineraryChange = (index, field, value) => {
+        const updated = [...formData.itinerary];
+        updated[index][field] = value;
+
+        if (field === 'amount') {
+            const total = updated.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+            setFormData(prev => ({ ...prev, itinerary: updated, totalAmount: total }));
+        } else {
+            setFormData(prev => ({ ...prev, itinerary: updated }));
+        }
+    };
+
+    const addItineraryDay = () => {
+        let nextDate = '';
+        if (formData.travelStartDate) {
+            const d = new Date(formData.travelStartDate);
+            d.setDate(d.getDate() + formData.itinerary.length);
+            nextDate = d.toISOString().split('T')[0];
+        }
+
+        const newDay = {
+            dayNo: formData.itinerary.length + 1,
+            date: nextDate,
+            time: '09:00 AM',
+            pickupPoint: '',
+            duty: '',
+            description: '',
+            vehicleType: formData.carType || '',
+            vehicleCount: formData.numberOfCars || 1,
+            estimatedKm: 0,
+            estimatedHours: 8,
+            amount: 0,
+            inclusions: '',
+            exclusions: '',
+            specialNotes: ''
+        };
+
+        setFormData(prev => ({
+            ...prev,
+            itinerary: [...prev.itinerary, newDay]
+        }));
+    };
+
+    const removeItineraryDay = (index) => {
+        const updated = formData.itinerary.filter((_, i) => i !== index).map((d, i) => ({ ...d, dayNo: i + 1 }));
+        const total = updated.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+        setFormData(prev => ({ ...prev, itinerary: updated, totalAmount: total }));
+    };
+
+    // Open Modal
     const handleOpenModal = (lead = null) => {
         setPhoneCheckResult(null);
         if (lead) {
             setEditingLead(lead);
             setFormData({
-                clientName: lead.clientName,
-                mobileNumber: lead.mobileNumber,
+                clientName: lead.clientName || '',
+                mobileNumber: lead.mobileNumber || '',
                 alternateMobile: lead.alternateMobile || '',
                 email: lead.email || '',
                 gstin: lead.gstin || '',
@@ -138,7 +207,7 @@ export default function Leads() {
                 leadDate: lead.leadDate ? new Date(lead.leadDate).toISOString().split('T')[0] : '',
                 travelStartDate: lead.travelStartDate ? new Date(lead.travelStartDate).toISOString().split('T')[0] : '',
                 travelEndDate: lead.travelEndDate ? new Date(lead.travelEndDate).toISOString().split('T')[0] : '',
-                carType: lead.carType,
+                carType: lead.carType || '',
                 numberOfCars: lead.numberOfCars || 1,
                 gstMode: lead.gstMode || 'GST Inclusive',
                 status: lead.status || 'New',
@@ -149,103 +218,88 @@ export default function Leads() {
             });
         } else {
             setEditingLead(null);
-            const todayStr = new Date().toISOString().split('T')[0];
+            const today = new Date().toISOString().split('T')[0];
             setFormData({
-                clientName: '', mobileNumber: '', alternateMobile: '', email: '', gstin: '',
-                source: 'Website', reference: '', salesPerson: '',
-                leadDate: todayStr, travelStartDate: '', travelEndDate: '',
-                carType: 'Innova Crysta', numberOfCars: 1, gstMode: 'GST Inclusive',
-                status: 'New', notes: '',
-                itinerary: [
-                    { dayNo: 1, date: '', time: '09:00 AM', pickupPoint: '', duty: 'Airport Pickup & Local Sightseeing', description: 'Airport Pickup & Local Sightseeing', vehicleType: 'Innova Crysta', amount: 0, inclusions: 'Fuel & Driver', exclusions: 'Toll & Parking' }
-                ],
-                extraCharges: [], totalAmount: 0
+                clientName: '',
+                mobileNumber: '',
+                alternateMobile: '',
+                email: '',
+                gstin: '',
+                source: 'Website',
+                reference: '',
+                salesPerson: '',
+                leadDate: today,
+                travelStartDate: today,
+                travelEndDate: today,
+                carType: 'Innova Crysta',
+                numberOfCars: 1,
+                gstMode: 'GST Inclusive',
+                status: 'New',
+                notes: '',
+                itinerary: [{
+                    dayNo: 1,
+                    date: today,
+                    time: '09:00 AM',
+                    pickupPoint: 'Airport / Hotel',
+                    duty: 'Full Day Sightseeing / Transfer',
+                    description: 'Full Day Sightseeing / Transfer',
+                    vehicleType: 'Innova Crysta',
+                    vehicleCount: 1,
+                    estimatedKm: 100,
+                    estimatedHours: 8,
+                    amount: 3500,
+                    inclusions: 'Driver, Fuel',
+                    exclusions: 'Toll, Parking, Border Tax',
+                    specialNotes: ''
+                }],
+                extraCharges: [],
+                totalAmount: 3500
             });
         }
         setShowModal(true);
     };
 
-    const addItineraryDay = () => {
-        const nextDayNo = formData.itinerary.length + 1;
-        setFormData(prev => ({
-            ...prev,
-            itinerary: [
-                ...prev.itinerary,
-                {
-                    dayNo: nextDayNo,
-                    date: '',
-                    time: '09:00 AM',
-                    pickupPoint: '',
-                    duty: '',
-                    description: '',
-                    vehicleType: prev.carType || '',
-                    vehicleCount: prev.numberOfCars || 1,
-                    estimatedKm: 0,
-                    amount: 0,
-                    inclusions: 'Fuel & Driver',
-                    exclusions: 'Toll, Parking, State Tax'
-                }
-            ]
-        }));
-    };
-
-    const removeItineraryDay = (index) => {
-        const newItinerary = [...formData.itinerary];
-        newItinerary.splice(index, 1);
-        calculateTotal(newItinerary, formData.extraCharges);
-    };
-
-    const handleItineraryChange = (index, field, value) => {
-        const newItinerary = [...formData.itinerary];
-        newItinerary[index][field] = field === 'amount' || field === 'estimatedKm' ? Number(value) : value;
-        if (field === 'duty') {
-            newItinerary[index].description = value;
-        }
-        calculateTotal(newItinerary, formData.extraCharges);
-    };
-
-    const calculateTotal = (itinerary, extraCharges) => {
-        const sum = itinerary.reduce((acc, curr) => acc + Number(curr.amount || 0), 0) +
-            extraCharges.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
-        setFormData(prev => ({ ...prev, itinerary, extraCharges, totalAmount: sum }));
-    };
-
+    // Save Lead Submit
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const payload = { ...formData, company: selectedCompany._id };
+            const payload = {
+                ...formData,
+                company: selectedCompany._id
+            };
+
             if (editingLead) {
-                await axios.put(`/api/leads/single/${editingLead._id}`, payload);
+                await axios.put(`/api/leads/${editingLead._id}`, payload);
             } else {
                 await axios.post('/api/leads', payload);
             }
+
             setShowModal(false);
             fetchLeads();
         } catch (error) {
             console.error('Error saving lead:', error);
-            alert('Failed to save lead: ' + (error.response?.data?.message || error.message));
+            alert(error.response?.data?.message || 'Error saving lead');
         }
     };
 
     const handleDelete = async (id) => {
         if (window.confirm('Are you sure you want to delete this lead?')) {
             try {
-                await axios.delete(`/api/leads/single/${id}`);
+                await axios.delete(`/api/leads/${id}`);
                 fetchLeads();
             } catch (error) {
                 console.error('Error deleting lead:', error);
-                alert(error.response?.data?.message || 'Failed to delete lead');
+                alert('Failed to delete lead');
             }
         }
     };
 
-    // Quotation PDF Generator
+    // Generate Quotation PDF
     const generateQuotationPDF = (lead) => {
         const doc = new jsPDF();
-        const pageWidth = doc.internal.pageSize.width;
-        const pageHeight = doc.internal.pageSize.height;
+        const pageWidth = doc.internal.pageSize.width || 210;
 
-        // Accent header
+        // Top accent
         doc.setFillColor(245, 158, 11);
         doc.rect(0, 0, pageWidth, 4, 'F');
 
@@ -265,10 +319,10 @@ export default function Leads() {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8);
         doc.setTextColor(245, 158, 11);
-        doc.text('TRAVEL QUOTATION', pageWidth - 50, 17, { align: 'center' });
+        doc.text('TRAVEL QUOTATION', pageWidth - 50, 16, { align: 'center' });
         doc.setFontSize(10);
         doc.setTextColor(15, 23, 42);
-        doc.text(lead.leadId || 'LK-QUOTATION', pageWidth - 50, 23, { align: 'center' });
+        doc.text(`Client Code: ${lead.clientCode || lead.leadId || 'N/A'}`, pageWidth - 50, 23, { align: 'center' });
 
         doc.setDrawColor(226, 232, 240);
         doc.line(14, 30, pageWidth - 14, 30);
@@ -323,7 +377,7 @@ export default function Leads() {
         doc.setTextColor(100, 116, 139);
         doc.text('Note: Toll, State Tax & Parking extra unless specified. AC off in hills or parked vehicle.', 14, finalY + 12);
 
-        doc.save(`${(lead.clientName || 'Guest').replace(/\s+/g, '_')}_Quotation.pdf`);
+        doc.save(`${(lead.clientName || 'Guest').replace(/\s+/g, '_')}_${lead.clientCode ? lead.clientCode.replace('/', '-') : 'Quotation'}.pdf`);
     };
 
     // Convert Lead to Booking
@@ -332,277 +386,796 @@ export default function Leads() {
         try {
             const adv = Number(advancePayment) || 0;
             if (adv <= 0 && !adminOverride) {
-                alert('Please enter advance payment amount or check admin override');
+                alert('Please enter advance received or check admin override checkbox');
                 return;
             }
 
-            const { data } = await axios.post(`/api/leads/${convertingLead._id}/convert`, {
+            const { data } = await axios.post(`/api/leads/${convertingLead._id}/convert-to-booking`, {
                 advancePayment: adv,
                 paymentMode,
                 paymentReference: paymentRef,
-                adminOverrideReason: adminOverride ? (adminOverrideReason || 'Admin Manual Override') : ''
+                adminOverrideReason: adminOverride ? adminOverrideReason : ''
             });
 
+            alert(`Booking confirmed successfully! Booking ID: ${data.bookingId}`);
             setShowConvertModal(false);
             fetchLeads();
-
-            if (window.confirm(`Booking Confirmed successfully!\nBooking ID: ${data.booking?.bookingId}\n\nWould you like to download the Booking Confirmation PDF now?`)) {
-                generateBookingConfirmationPDF(data.booking, selectedCompany);
-            }
         } catch (error) {
-            console.error('Error converting lead:', error);
-            alert('Failed to convert booking: ' + (error.response?.data?.message || error.message));
+            console.error('Error converting lead to booking:', error);
+            alert(error.response?.data?.message || 'Failed to convert lead to booking');
+        }
+    };
+
+    // Filter leads on client side for source and salesperson
+    const filteredLeads = useMemo(() => {
+        return leads.filter(lead => {
+            if (sourceFilter !== 'All' && lead.source !== sourceFilter) return false;
+            if (salesPersonFilter !== 'All' && lead.salesPerson !== salesPersonFilter) return false;
+            return true;
+        });
+    }, [leads, sourceFilter, salesPersonFilter]);
+
+    // Unique sales persons
+    const salesPersonsList = useMemo(() => {
+        const set = new Set();
+        leads.forEach(l => { if (l.salesPerson) set.add(l.salesPerson); });
+        return Array.from(set);
+    }, [leads]);
+
+    // KPI Summary Calculations
+    const kpiData = useMemo(() => {
+        let totalQuote = 0;
+        let convertedQuote = 0;
+        let convertedCount = 0;
+
+        leads.forEach(l => {
+            const amt = Number(l.totalAmount) || 0;
+            totalQuote += amt;
+            if (l.status === 'Confirmed' || l.bookingId) {
+                convertedQuote += amt;
+                convertedCount += 1;
+            }
+        });
+
+        return {
+            totalQuote,
+            totalLeadsCount: leads.length,
+            convertedQuote,
+            convertedCount
+        };
+    }, [leads]);
+
+    // Pagination calculations
+    const totalPages = Math.ceil(filteredLeads.length / itemsPerPage) || 1;
+    const paginatedLeads = useMemo(() => {
+        const start = (currentPage - 1) * itemsPerPage;
+        return filteredLeads.slice(start, start + itemsPerPage);
+    }, [filteredLeads, currentPage]);
+
+    // Helpers for rendering table cells
+    const formatCreatedDate = (dateVal) => {
+        if (!dateVal) return 'N/A';
+        const d = new Date(dateVal);
+        if (isNaN(d.getTime())) return 'N/A';
+        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
+
+    const formatTravelMonth = (startDate, endDate) => {
+        if (!startDate) return { month: 'TBA', days: 1 };
+        const s = new Date(startDate);
+        const mStr = isNaN(s.getTime()) ? 'TBA' : s.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+        let days = 1;
+        if (endDate) {
+            const e = new Date(endDate);
+            if (!isNaN(e.getTime()) && !isNaN(s.getTime())) {
+                const diffTime = Math.abs(e - s);
+                days = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1);
+            }
+        }
+        return { month: mStr, days };
+    };
+
+    const renderSourceIcon = (source) => {
+        const s = (source || '').toLowerCase();
+        if (s.includes('google')) {
+            return (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#f87171' }}>
+                    <span style={{ fontWeight: '900', color: '#38bdf8', fontSize: '13px' }}>G</span> Google Ads
+                </span>
+            );
+        }
+        if (s.includes('referral')) {
+            return (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#38bdf8' }}>
+                    <Share2 size={13} color="#38bdf8" /> Referral
+                </span>
+            );
+        }
+        if (s.includes('hotel')) {
+            return (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#facc15' }}>
+                    <Building2 size={13} color="#facc15" /> Hotel
+                </span>
+            );
+        }
+        if (s.includes('repeat')) {
+            return (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#4ade80' }}>
+                    <Repeat size={13} color="#4ade80" /> Repeat Guest
+                </span>
+            );
+        }
+        if (s.includes('website')) {
+            return (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#818cf8' }}>
+                    <Globe size={13} color="#818cf8" /> Website
+                </span>
+            );
+        }
+        return (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'rgba(255,255,255,0.7)' }}>
+                <Briefcase size={13} color="var(--primary)" /> {source || 'Direct'}
+            </span>
+        );
+    };
+
+    const renderStatusPill = (status) => {
+        switch (status) {
+            case 'Confirmed':
+                return (
+                    <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '4px 12px',
+                        borderRadius: '20px',
+                        fontSize: '11px',
+                        fontWeight: '800',
+                        background: 'rgba(34, 197, 94, 0.15)',
+                        color: '#4ade80',
+                        border: '1px solid rgba(34, 197, 94, 0.3)'
+                    }}>
+                        <CheckCircle size={12} /> Confirmed
+                    </span>
+                );
+            case 'Open':
+            case 'New':
+                return (
+                    <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '4px 12px',
+                        borderRadius: '20px',
+                        fontSize: '11px',
+                        fontWeight: '800',
+                        background: 'rgba(56, 189, 248, 0.15)',
+                        color: '#38bdf8',
+                        border: '1px solid rgba(56, 189, 248, 0.3)'
+                    }}>
+                        <CircleDot size={12} /> {status === 'New' ? 'Open' : status}
+                    </span>
+                );
+            case 'Converted':
+                return (
+                    <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '4px 12px',
+                        borderRadius: '20px',
+                        fontSize: '11px',
+                        fontWeight: '800',
+                        background: 'rgba(20, 184, 166, 0.15)',
+                        color: '#2dd4bf',
+                        border: '1px solid rgba(20, 184, 166, 0.3)'
+                    }}>
+                        <BarChart2 size={12} /> Converted
+                    </span>
+                );
+            case 'Dead':
+            case 'Lost':
+            case 'Cancelled':
+                return (
+                    <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '4px 12px',
+                        borderRadius: '20px',
+                        fontSize: '11px',
+                        fontWeight: '800',
+                        background: 'rgba(239, 68, 68, 0.15)',
+                        color: '#f87171',
+                        border: '1px solid rgba(239, 68, 68, 0.3)'
+                    }}>
+                        <XCircle size={12} /> {status === 'Cancelled' || status === 'Lost' ? 'Dead' : status}
+                    </span>
+                );
+            default:
+                return (
+                    <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '4px 12px',
+                        borderRadius: '20px',
+                        fontSize: '11px',
+                        fontWeight: '800',
+                        background: 'rgba(245, 158, 11, 0.15)',
+                        color: 'var(--primary)',
+                        border: '1px solid rgba(245, 158, 11, 0.3)'
+                    }}>
+                        <Clock size={12} /> {status}
+                    </span>
+                );
         }
     };
 
     const inputStyle = {
-        width: '100%',
-        padding: '11px 14px',
-        borderRadius: '10px',
+        background: 'rgba(255,255,255,0.05)',
         border: '1px solid rgba(255,255,255,0.1)',
-        background: 'rgba(0,0,0,0.25)',
         color: 'white',
+        padding: '10px 14px',
+        borderRadius: '8px',
         outline: 'none',
+        width: '100%',
         fontSize: '13px'
     };
 
     return (
-        <div className="container-fluid" style={{ minHeight: '100vh', padding: '40px 20px', position: 'relative' }}>
-            <SEO title="Lead & Enquiry Management" />
+        <div className="container-fluid" style={{ padding: '24px', minHeight: '100vh', background: 'transparent' }}>
+            <SEO title="Sales God - Leads & Quotes" description="Manage taxi fleet sales leads, client codes, quotes and conversions." />
 
-            {/* Header */}
-            <header style={{ marginBottom: '25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            {/* 1. Header with 'Sales God' Title & KPI Summary Cards */}
+            <header style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '16px',
+                marginBottom: '20px'
+            }}>
+                {/* Title */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{
-                        width: '45px',
-                        height: '45px',
-                        background: 'rgba(245, 158, 11, 0.12)',
+                        width: '44px',
+                        height: '44px',
                         borderRadius: '12px',
+                        background: 'rgba(245, 158, 11, 0.15)',
+                        border: '1px solid rgba(245, 158, 11, 0.3)',
                         display: 'flex',
-                        justifyContent: 'center',
                         alignItems: 'center',
-                        color: 'var(--primary)'
+                        justifyContent: 'center'
                     }}>
-                        <Briefcase size={26} />
+                        <BarChart3 size={24} color="var(--primary)" />
                     </div>
                     <div>
-                        <h1 style={{ fontSize: '26px', fontWeight: '900', color: 'white', letterSpacing: '-0.5px', margin: 0 }}>
-                            Sales <span className="text-gradient-yellow">Leads & Quotes</span>
+                        <h1 style={{ color: 'white', fontSize: '26px', fontWeight: '900', margin: 0, letterSpacing: '-0.5px' }}>
+                            Sales God
                         </h1>
-                        <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', marginTop: '4px', margin: 0 }}>
-                            Manage customer enquiries, build day-wise itineraries, quote packages, and convert to bookings.
+                        <p style={{ color: 'rgba(255,255,255,0.5)', margin: 0, fontSize: '12px' }}>
+                            Enterprise Lead Management & Quotation Engine
                         </p>
                     </div>
                 </div>
 
-                <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => handleOpenModal()}
-                    style={{
-                        padding: '12px 24px',
-                        background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
-                        color: '#000',
-                        border: 'none',
-                        borderRadius: '12px',
+                {/* Right side KPIs + Create Button */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                    {/* Total Quote Card */}
+                    <div style={{
+                        background: 'rgba(30, 58, 138, 0.35)',
+                        border: '1px solid rgba(59, 130, 246, 0.3)',
+                        borderRadius: '14px',
+                        padding: '10px 18px',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px',
-                        cursor: 'pointer',
-                        fontWeight: '800',
-                        boxShadow: '0 4px 15px rgba(245, 158, 11, 0.3)'
-                    }}
-                >
-                    <Plus size={20} /> Create New Lead
-                </motion.button>
-            </header>
+                        gap: '12px',
+                        minWidth: '170px'
+                    }}>
+                        <div style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '10px',
+                            background: 'rgba(59, 130, 246, 0.2)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#60a5fa'
+                        }}>
+                            <FileText size={18} />
+                        </div>
+                        <div>
+                            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontWeight: '600' }}>Total Quote</div>
+                            <div style={{ fontSize: '18px', fontWeight: '900', color: 'white' }}>₹{kpiData.totalQuote.toLocaleString('en-IN')}</div>
+                            <div style={{ fontSize: '10px', color: '#93c5fd' }}>Across {kpiData.totalLeadsCount} leads</div>
+                        </div>
+                    </div>
 
-            {/* Status Tabs Bar */}
-            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px', marginBottom: '15px' }}>
-                {['All', ...LEAD_STATUSES].map(st => (
-                    <button
-                        key={st}
-                        onClick={() => setStatusFilter(st)}
+                    {/* Converted Quote Card */}
+                    <div style={{
+                        background: 'rgba(6, 78, 59, 0.35)',
+                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                        borderRadius: '14px',
+                        padding: '10px 18px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        minWidth: '170px'
+                    }}>
+                        <div style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '10px',
+                            background: 'rgba(16, 185, 129, 0.2)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#34d399'
+                        }}>
+                            <TrendingUp size={18} />
+                        </div>
+                        <div>
+                            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontWeight: '600' }}>Converted Quote</div>
+                            <div style={{ fontSize: '18px', fontWeight: '900', color: '#4ade80' }}>₹{kpiData.convertedQuote.toLocaleString('en-IN')}</div>
+                            <div style={{ fontSize: '10px', color: '#86efac' }}>From {kpiData.convertedCount} bookings</div>
+                        </div>
+                    </div>
+
+                    {/* + Create a Lead Button */}
+                    <motion.button
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => handleOpenModal()}
                         style={{
-                            padding: '8px 16px',
-                            borderRadius: '20px',
+                            background: '#fbbf24',
+                            color: '#000',
                             border: 'none',
-                            fontSize: '12px',
-                            fontWeight: '700',
+                            borderRadius: '30px',
+                            padding: '12px 22px',
+                            fontSize: '14px',
+                            fontWeight: '800',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
                             cursor: 'pointer',
-                            background: statusFilter === st ? 'var(--primary)' : 'rgba(255,255,255,0.06)',
-                            color: statusFilter === st ? '#000' : 'rgba(255,255,255,0.7)',
-                            transition: 'all 0.2s ease'
+                            boxShadow: '0 4px 18px rgba(251, 191, 36, 0.35)'
                         }}
                     >
-                        {st}
-                    </button>
-                ))}
+                        <Plus size={18} strokeWidth={3} /> Create a Lead
+                    </motion.button>
+                </div>
+            </header>
+
+            {/* 2. FY Badge & Month Tabs Bar */}
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                overflowX: 'auto',
+                paddingBottom: '8px',
+                marginBottom: '16px'
+            }}>
+                <div style={{
+                    padding: '8px 16px',
+                    borderRadius: '20px',
+                    background: '#fbbf24',
+                    color: '#000',
+                    fontSize: '12px',
+                    fontWeight: '900',
+                    letterSpacing: '0.3px',
+                    whiteSpace: 'nowrap'
+                }}>
+                    FY 26-27
+                </div>
+
+                {MONTH_TABS.map(m => {
+                    const isActive = monthFilter === m;
+                    return (
+                        <button
+                            key={m}
+                            onClick={() => {
+                                setMonthFilter(m);
+                                setCurrentPage(1);
+                            }}
+                            style={{
+                                padding: '8px 18px',
+                                borderRadius: '20px',
+                                border: 'none',
+                                fontSize: '12px',
+                                fontWeight: isActive ? '800' : '600',
+                                cursor: 'pointer',
+                                background: isActive ? '#fbbf24' : 'rgba(255,255,255,0.06)',
+                                color: isActive ? '#000' : 'rgba(255,255,255,0.7)',
+                                transition: 'all 0.15s ease',
+                                whiteSpace: 'nowrap'
+                            }}
+                        >
+                            {m}
+                        </button>
+                    );
+                })}
             </div>
 
-            {/* Search Bar */}
-            <div className="glass-card" style={{ padding: '15px 20px', marginBottom: '20px', display: 'flex', gap: '12px' }}>
-                <form onSubmit={handleSearchSubmit} style={{ display: 'flex', flex: 1, gap: '10px' }}>
-                    <div style={{ position: 'relative', flex: 1 }}>
-                        <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.4)' }} />
+            {/* 3. Filter Bar: Search + Sales Person Dropdown + Source Dropdown */}
+            <div className="glass-card" style={{
+                padding: '14px 18px',
+                marginBottom: '18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px'
+            }}>
+                {/* Search Input */}
+                <form onSubmit={handleSearchSubmit} style={{ flex: '1 1 300px', display: 'flex', gap: '8px' }}>
+                    <div style={{ position: 'relative', width: '100%' }}>
+                        <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.4)' }} />
                         <input
                             type="text"
-                            placeholder="Search by Lead ID, Guest Name, Mobile Number, or Source..."
+                            placeholder="Search by client code, phone number, source..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            style={{ ...inputStyle, paddingLeft: '38px' }}
+                            style={{
+                                ...inputStyle,
+                                paddingLeft: '40px',
+                                background: 'rgba(0,0,0,0.3)',
+                                borderRadius: '10px'
+                            }}
                         />
                     </div>
-                    <button type="submit" className="primary-btn" style={{ padding: '0 20px', borderRadius: '10px' }}>Search</button>
+                    <button type="submit" className="primary-btn" style={{ padding: '0 18px', borderRadius: '10px', fontSize: '13px', fontWeight: '700' }}>
+                        Search
+                    </button>
                 </form>
+
+                {/* Filters */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    {/* Sales Person Filter */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.3)', padding: '6px 12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <Users size={14} color="#38bdf8" />
+                        <select
+                            value={salesPersonFilter}
+                            onChange={e => {
+                                setSalesPersonFilter(e.target.value);
+                                setCurrentPage(1);
+                            }}
+                            style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'white',
+                                fontSize: '12px',
+                                outline: 'none',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            <option value="All" style={{ background: '#0f172a' }}>Filter by Sales Person</option>
+                            {salesPersonsList.map(sp => (
+                                <option key={sp} value={sp} style={{ background: '#0f172a' }}>{sp}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Source Filter */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.3)', padding: '6px 12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <Filter size={14} color="var(--primary)" />
+                        <select
+                            value={sourceFilter}
+                            onChange={e => {
+                                setSourceFilter(e.target.value);
+                                setCurrentPage(1);
+                            }}
+                            style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'white',
+                                fontSize: '12px',
+                                outline: 'none',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            <option value="All" style={{ background: '#0f172a' }}>Filter by Source</option>
+                            {LEAD_SOURCES.map(src => (
+                                <option key={src} value={src} style={{ background: '#0f172a' }}>{src}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
             </div>
 
-            {/* Leads Table */}
-            <div className="glass-card" style={{ padding: '0', overflowX: 'auto' }}>
+            {/* 4. Leads Table Matching Reference Design */}
+            <div className="glass-card" style={{ padding: '0', overflowX: 'auto', borderRadius: '14px' }}>
                 <table style={{ width: '100%', color: 'white', borderCollapse: 'collapse', textAlign: 'left' }}>
-                    <thead style={{ background: 'rgba(0,0,0,0.25)' }}>
+                    <thead style={{ background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                         <tr>
-                            <th style={{ padding: '16px 20px', fontWeight: '600', color: 'rgba(255,255,255,0.7)' }}>Lead ID & Source</th>
-                            <th style={{ padding: '16px 20px', fontWeight: '600', color: 'rgba(255,255,255,0.7)' }}>Guest Details</th>
-                            <th style={{ padding: '16px 20px', fontWeight: '600', color: 'rgba(255,255,255,0.7)' }}>Travel Dates</th>
-                            <th style={{ padding: '16px 20px', fontWeight: '600', color: 'rgba(255,255,255,0.7)' }}>Vehicle</th>
-                            <th style={{ padding: '16px 20px', fontWeight: '600', color: 'rgba(255,255,255,0.7)' }}>Quote Fare</th>
-                            <th style={{ padding: '16px 20px', fontWeight: '600', color: 'rgba(255,255,255,0.7)', textAlign: 'center' }}>Status</th>
-                            <th style={{ padding: '16px 20px', fontWeight: '600', color: 'rgba(255,255,255,0.7)', textAlign: 'right' }}>Actions</th>
+                            <th style={{ padding: '16px 20px', fontWeight: '700', fontSize: '12px', color: 'rgba(255,255,255,0.7)', letterSpacing: '0.3px' }}>
+                                Lead Created ↕
+                            </th>
+                            <th style={{ padding: '16px 20px', fontWeight: '700', fontSize: '12px', color: 'rgba(255,255,255,0.7)', letterSpacing: '0.3px' }}>
+                                Client Code ↕
+                            </th>
+                            <th style={{ padding: '16px 20px', fontWeight: '700', fontSize: '12px', color: 'rgba(255,255,255,0.7)', letterSpacing: '0.3px' }}>
+                                Source ↕
+                            </th>
+                            <th style={{ padding: '16px 20px', fontWeight: '700', fontSize: '12px', color: 'rgba(255,255,255,0.7)', letterSpacing: '0.3px' }}>
+                                Travel Month ↕
+                            </th>
+                            <th style={{ padding: '16px 20px', fontWeight: '700', fontSize: '12px', color: 'rgba(255,255,255,0.7)', letterSpacing: '0.3px' }}>
+                                Price ↕
+                            </th>
+                            <th style={{ padding: '16px 20px', fontWeight: '700', fontSize: '12px', color: 'rgba(255,255,255,0.7)', letterSpacing: '0.3px' }}>
+                                Status ↕
+                            </th>
+                            <th style={{ padding: '16px 20px', fontWeight: '700', fontSize: '12px', color: 'rgba(255,255,255,0.7)', textAlign: 'right' }}>
+                                Actions
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
                         {loading ? (
-                            <tr><td colSpan="7" style={{ textAlign: 'center', padding: '50px' }}><div className="loader"></div></td></tr>
-                        ) : leads.length === 0 ? (
-                            <tr><td colSpan="7" style={{ textAlign: 'center', padding: '50px', color: 'rgba(255,255,255,0.5)' }}>No leads found. Create your first lead!</td></tr>
-                        ) : leads.map(lead => (
-                            <tr key={lead._id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                {/* Lead ID & Source */}
-                                <td style={{ padding: '16px 20px' }}>
-                                    <div style={{ fontWeight: '800', fontSize: '13px', color: 'var(--primary)' }}>
-                                        {lead.leadId || 'LK-LEAD'}
-                                    </div>
-                                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
-                                        {lead.source || 'Direct'} {lead.salesPerson ? `| By ${lead.salesPerson}` : ''}
-                                    </div>
+                            <tr>
+                                <td colSpan="7" style={{ textAlign: 'center', padding: '60px' }}>
+                                    <div className="loader" style={{ margin: '0 auto' }}></div>
+                                    <div style={{ marginTop: '12px', color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>Loading leads...</div>
                                 </td>
-
-                                {/* Guest Details */}
-                                <td style={{ padding: '16px 20px' }}>
-                                    <div style={{ fontWeight: '800', fontSize: '15px' }}>{lead.clientName}</div>
-                                    <div style={{ fontSize: '12px', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-                                        <Phone size={11} /> {lead.mobileNumber}
-                                    </div>
+                            </tr>
+                        ) : paginatedLeads.length === 0 ? (
+                            <tr>
+                                <td colSpan="7" style={{ textAlign: 'center', padding: '60px', color: 'rgba(255,255,255,0.5)' }}>
+                                    No leads found for this filter. Click <strong>+ Create a Lead</strong> to get started!
                                 </td>
+                            </tr>
+                        ) : paginatedLeads.map((lead) => {
+                            const travelInfo = formatTravelMonth(lead.travelStartDate, lead.travelEndDate);
 
-                                {/* Travel Dates */}
-                                <td style={{ padding: '16px 20px', fontSize: '13px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                        <Calendar size={13} color="var(--primary)" />
-                                        <span>{new Date(lead.travelStartDate).toLocaleDateString('en-IN')} - {new Date(lead.travelEndDate).toLocaleDateString('en-IN')}</span>
-                                    </div>
-                                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '3px' }}>
-                                        {lead.itinerary?.length || 1} day schedule
-                                    </div>
-                                </td>
+                            return (
+                                <tr key={lead._id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.15s ease' }}>
+                                    {/* 1. Lead Created */}
+                                    <td style={{ padding: '16px 20px', fontSize: '13px', color: 'rgba(255,255,255,0.9)' }}>
+                                        {formatCreatedDate(lead.leadDate || lead.createdAt)}
+                                    </td>
 
-                                {/* Vehicle */}
-                                <td style={{ padding: '16px 20px' }}>
-                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.05)', padding: '4px 10px', borderRadius: '12px', fontSize: '12px' }}>
-                                        <Car size={12} color="var(--primary)" /> {lead.numberOfCars}x {lead.carType}
-                                    </div>
-                                </td>
+                                    {/* 2. Client Code (MM/SS with Tooltip) */}
+                                    <td style={{ padding: '16px 20px', position: 'relative' }}>
+                                        <div
+                                            style={{ position: 'relative', display: 'inline-block' }}
+                                            onMouseEnter={() => setHoveredLeadId(lead._id)}
+                                            onMouseLeave={() => setHoveredLeadId(null)}
+                                        >
+                                            <div style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                color: '#38bdf8',
+                                                fontWeight: '900',
+                                                fontSize: '15px',
+                                                cursor: 'pointer'
+                                            }}>
+                                                <User size={15} color="#38bdf8" />
+                                                <span>{lead.clientCode || lead.leadId || 'N/A'}</span>
+                                            </div>
 
-                                {/* Fare */}
-                                <td style={{ padding: '16px 20px' }}>
-                                    <div style={{ fontWeight: '900', color: 'white', fontSize: '15px' }}>₹{(lead.totalAmount || 0).toLocaleString('en-IN')}</div>
-                                    <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>{lead.gstMode || 'GST Inclusive'}</div>
-                                </td>
-
-                                {/* Status */}
-                                <td style={{ padding: '16px 20px', textAlign: 'center' }}>
-                                    <span style={{
-                                        padding: '4px 10px',
-                                        borderRadius: '20px',
-                                        fontSize: '11px',
-                                        fontWeight: '800',
-                                        textTransform: 'uppercase',
-                                        background: lead.status === 'Confirmed' ? 'rgba(34,197,94,0.15)' : (lead.status === 'Lost' || lead.status === 'Cancelled' ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)'),
-                                        color: lead.status === 'Confirmed' ? '#4ade80' : (lead.status === 'Lost' || lead.status === 'Cancelled' ? '#f87171' : 'var(--primary)'),
-                                        border: `1px solid ${lead.status === 'Confirmed' ? 'rgba(34,197,94,0.3)' : (lead.status === 'Lost' || lead.status === 'Cancelled' ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.3)')}`
-                                    }}>
-                                        {lead.status}
-                                    </span>
-                                    {lead.bookingId && (
-                                        <div style={{ fontSize: '10px', color: '#4ade80', fontWeight: '800', marginTop: '4px' }}>
-                                            {lead.bookingId}
+                                            {/* Hover Tooltip matching Image 1 */}
+                                            {hoveredLeadId === lead._id && (
+                                                <div style={{
+                                                    position: 'absolute',
+                                                    top: '110%',
+                                                    left: '0',
+                                                    background: '#0a0f1d',
+                                                    border: '1px solid rgba(56, 189, 248, 0.4)',
+                                                    borderRadius: '8px',
+                                                    padding: '8px 12px',
+                                                    boxShadow: '0 10px 25px rgba(0,0,0,0.8)',
+                                                    zIndex: 100,
+                                                    minWidth: '150px'
+                                                }}>
+                                                    <div style={{ color: '#f1f5f9', fontWeight: '700', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <User size={11} color="#38bdf8" /> {lead.clientName}
+                                                    </div>
+                                                    <div style={{ color: '#38bdf8', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
+                                                        <Phone size={11} /> {lead.mobileNumber}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
-                                </td>
+                                    </td>
 
-                                {/* Actions */}
-                                <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                                    <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                                        {lead.status !== 'Confirmed' ? (
+                                    {/* 3. Source */}
+                                    <td style={{ padding: '16px 20px', fontSize: '13px', fontWeight: '600' }}>
+                                        {renderSourceIcon(lead.source)}
+                                    </td>
+
+                                    {/* 4. Travel Month */}
+                                    <td style={{ padding: '16px 20px' }}>
+                                        <div style={{ fontSize: '13px', color: 'white', fontWeight: '700' }}>
+                                            {travelInfo.month}
+                                        </div>
+                                        <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
+                                            Days: {travelInfo.days}
+                                        </div>
+                                    </td>
+
+                                    {/* 5. Price */}
+                                    <td style={{ padding: '16px 20px' }}>
+                                        <div style={{ fontWeight: '900', color: 'white', fontSize: '15px' }}>
+                                            ₹{(lead.totalAmount || 0).toLocaleString('en-IN')}
+                                        </div>
+                                    </td>
+
+                                    {/* 6. Status */}
+                                    <td style={{ padding: '16px 20px' }}>
+                                        {renderStatusPill(lead.status)}
+                                    </td>
+
+                                    {/* 7. Actions */}
+                                    <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                            {/* Book action if not confirmed */}
+                                            {lead.status !== 'Confirmed' && (
+                                                <button
+                                                    onClick={() => {
+                                                        setConvertingLead(lead);
+                                                        setAdvancePayment('');
+                                                        setPaymentRef('');
+                                                        setAdminOverride(false);
+                                                        setShowConvertModal(true);
+                                                    }}
+                                                    title="Convert to Confirmed Booking"
+                                                    style={{
+                                                        background: 'rgba(34, 197, 94, 0.2)',
+                                                        color: '#4ade80',
+                                                        border: '1px solid rgba(34, 197, 94, 0.3)',
+                                                        padding: '6px 10px',
+                                                        borderRadius: '8px',
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px',
+                                                        fontWeight: '700',
+                                                        fontSize: '11px'
+                                                    }}
+                                                >
+                                                    <CheckCircle size={13} /> Book
+                                                </button>
+                                            )}
+
+                                            {/* Quotation PDF */}
                                             <button
-                                                onClick={() => {
-                                                    setConvertingLead(lead);
-                                                    setAdvancePayment('');
-                                                    setPaymentRef('');
-                                                    setAdminOverride(false);
-                                                    setShowConvertModal(true);
-                                                }}
+                                                onClick={() => generateQuotationPDF(lead)}
+                                                title="Download Quotation PDF"
                                                 style={{
-                                                    background: 'rgba(34, 197, 94, 0.2)',
-                                                    color: '#4ade80',
-                                                    border: '1px solid rgba(34, 197, 94, 0.3)',
-                                                    padding: '6px 12px',
+                                                    background: 'rgba(59, 130, 246, 0.15)',
+                                                    color: '#60a5fa',
+                                                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                                                    padding: '6px 8px',
                                                     borderRadius: '8px',
                                                     cursor: 'pointer',
                                                     display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '4px',
-                                                    fontWeight: '700',
-                                                    fontSize: '12px'
+                                                    alignItems: 'center'
                                                 }}
                                             >
-                                                <CheckCircle size={13} /> Book
+                                                <FileText size={14} />
                                             </button>
-                                        ) : (
-                                            <span style={{ fontSize: '11px', color: '#4ade80', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: '700', padding: '6px 0' }}>
-                                                <ShieldCheck size={14} /> Confirmed
-                                            </span>
-                                        )}
 
-                                        <button
-                                            onClick={() => generateQuotationPDF(lead)}
-                                            title="Download Quotation PDF"
-                                            style={{
-                                                background: 'rgba(59, 130, 246, 0.15)',
-                                                color: '#60a5fa',
-                                                border: '1px solid rgba(59, 130, 246, 0.3)',
-                                                padding: '6px 10px',
-                                                borderRadius: '8px',
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '4px',
-                                                fontSize: '12px',
-                                                fontWeight: '700'
-                                            }}
-                                        >
-                                            <Download size={13} /> Quote
-                                        </button>
+                                            {/* Edit */}
+                                            <button
+                                                onClick={() => handleOpenModal(lead)}
+                                                title="Edit Lead"
+                                                style={{
+                                                    background: 'rgba(255,255,255,0.06)',
+                                                    border: 'none',
+                                                    color: '#f1f5f9',
+                                                    padding: '6px 8px',
+                                                    borderRadius: '8px',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center'
+                                                }}
+                                            >
+                                                <Edit size={14} />
+                                            </button>
 
-                                        <button onClick={() => handleOpenModal(lead)} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#f1f5f9', padding: '6px 8px', borderRadius: '8px', cursor: 'pointer' }}><Edit size={14} /></button>
-                                        <button onClick={() => handleDelete(lead._id)} style={{ background: 'rgba(239,68,68,0.1)', border: 'none', color: '#ef4444', padding: '6px 8px', borderRadius: '8px', cursor: 'pointer' }}><Trash2 size={14} /></button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
+                                            {/* Delete */}
+                                            <button
+                                                onClick={() => handleDelete(lead._id)}
+                                                title="Delete Lead"
+                                                style={{
+                                                    background: 'rgba(239,68,68,0.12)',
+                                                    border: 'none',
+                                                    color: '#ef4444',
+                                                    padding: '6px 8px',
+                                                    borderRadius: '8px',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center'
+                                                }}
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
+            </div>
+
+            {/* 5. Pagination Bar matching Reference Design */}
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '16px 4px',
+                marginTop: '10px',
+                color: 'rgba(255,255,255,0.6)',
+                fontSize: '13px'
+            }}>
+                <div>
+                    Showing {paginatedLeads.length} of {filteredLeads.length} leads
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <button
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            background: 'rgba(255,255,255,0.04)',
+                            color: 'white',
+                            cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            opacity: currentPage === 1 ? 0.4 : 1
+                        }}
+                    >
+                        <ChevronLeft size={16} />
+                    </button>
+
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                        <button
+                            key={p}
+                            onClick={() => setCurrentPage(p)}
+                            style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: currentPage === p ? '#fbbf24' : 'rgba(255,255,255,0.06)',
+                                color: currentPage === p ? '#000' : 'white',
+                                fontWeight: currentPage === p ? '800' : '600',
+                                fontSize: '13px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            {p}
+                        </button>
+                    ))}
+
+                    <button
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                        style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            background: 'rgba(255,255,255,0.04)',
+                            color: 'white',
+                            cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            opacity: currentPage === totalPages ? 0.4 : 1
+                        }}
+                    >
+                        <ChevronRight size={16} />
+                    </button>
+                </div>
             </div>
 
             {/* Modal: Create or Edit Lead */}
@@ -611,7 +1184,9 @@ export default function Leads() {
                     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
                         <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 30, opacity: 0 }} className="glass-card" style={{ width: '92%', maxWidth: '850px', maxHeight: '92vh', overflowY: 'auto', background: '#0f172a', padding: '30px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>
-                                <h2 style={{ color: 'white', margin: 0, fontSize: '20px', fontWeight: '800' }}>{editingLead ? `Edit Lead (${editingLead.leadId || 'LK-LEAD'})` : 'Create New Lead & Quotation'}</h2>
+                                <h2 style={{ color: 'white', margin: 0, fontSize: '20px', fontWeight: '800' }}>
+                                    {editingLead ? `Edit Lead (${editingLead.clientCode || editingLead.leadId || 'LK-LEAD'})` : 'Create New Lead & Quotation'}
+                                </h2>
                                 <button onClick={() => setShowModal(false)} style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer' }}><X size={20} /></button>
                             </div>
 
@@ -729,7 +1304,7 @@ export default function Leads() {
                                 </div>
                                 <h2 style={{ color: 'white', margin: 0, fontSize: '20px', fontWeight: '900' }}>Confirm Booking</h2>
                                 <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', marginTop: '4px' }}>
-                                    Convert <strong>{convertingLead.clientName}</strong>'s enquiry into an official confirmed booking.
+                                    Convert <strong>{convertingLead.clientName}</strong> (Client Code: <strong>{convertingLead.clientCode || convertingLead.leadId}</strong>) into an official confirmed booking.
                                 </p>
                             </div>
 
