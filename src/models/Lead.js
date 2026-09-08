@@ -4,13 +4,13 @@ const itinerarySchema = new mongoose.Schema({
     dayNo: { type: Number, default: 1 },
     date: { type: Date, required: true },
     time: { type: String, default: '09:00 AM' },
+    isApg: { type: Boolean, default: false },
     pickupPoint: { type: String, default: '' },
     duty: { type: String, default: '' },
-    description: { type: String, required: true }, // Keep description for backwards compatibility
+    description: { type: String, default: '' }, // Keep description for backwards compatibility
     vehicleType: { type: String, default: '' },
     vehicleCount: { type: Number, default: 1 },
-    estimatedKm: { type: Number, default: 0 },
-    estimatedHours: { type: Number, default: 0 },
+    rate: { type: Number, default: 0 },
     amount: { type: Number, required: true, default: 0 },
     inclusions: { type: String, default: '' },
     exclusions: { type: String, default: '' },
@@ -128,6 +128,16 @@ const leadSchema = new mongoose.Schema({
     notes: {
         type: String,
         default: ''
+    },
+    specialRemarks: {
+        type: String,
+        default: ''
+    },
+    inclusions: {
+        driverAllowance: { type: Boolean, default: true },
+        nightAllowance: { type: Boolean, default: true },
+        tollParking: { type: Boolean, default: true },
+        gstIncluded: { type: Boolean, default: true }
     }
 }, {
     timestamps: true

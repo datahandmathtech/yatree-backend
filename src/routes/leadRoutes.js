@@ -7,7 +7,8 @@ const {
     createLead,
     updateLead,
     deleteLead,
-    convertToBooking
+    convertToBooking,
+    getNextClientCodePreview
 } = require('../controllers/leadController');
 const { adminOrExecutive, checkCompany, protect } = require('../middleware/authMiddleware');
 
@@ -15,6 +16,9 @@ router.use(protect);
 
 router.route('/')
     .post(adminOrExecutive, createLead);
+
+router.route('/next-client-code/:companyId')
+    .get(adminOrExecutive, checkCompany, getNextClientCodePreview);
 
 router.route('/check-phone/:companyId')
     .get(adminOrExecutive, checkCompany, checkDuplicatePhone);

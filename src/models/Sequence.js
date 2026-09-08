@@ -58,8 +58,27 @@ const getNextClientCode = async (companyId, date = new Date()) => {
     return `${monthStr}/${seqStr}`;
 };
 
+/**
+ * Previews what the next client code will be WITHOUT incrementing it
+ */
+const previewNextClientCode = async (companyId, date = new Date()) => {
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const monthNum = d.getMonth() + 1;
+    const monthStr = String(monthNum).padStart(2, '0');
+    const compKey = companyId ? String(companyId) : 'DEFAULT';
+    const key = `CLIENT_CODE-${compKey}-${year}-${monthStr}`;
+
+    const seqDoc = await Sequence.findOne({ id: key });
+    const currentSeq = seqDoc ? seqDoc.seq : 0;
+    const nextSeq = currentSeq + 1;
+    const seqStr = String(nextSeq).padStart(2, '0');
+    return `${monthStr}/${seqStr}`;
+};
+
 module.exports = {
     Sequence,
     getNextSequence,
-    getNextClientCode
+    getNextClientCode,
+    previewNextClientCode
 };

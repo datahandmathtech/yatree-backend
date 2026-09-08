@@ -37,8 +37,12 @@ const getDRSDuties = asyncHandler(async (req, res) => {
         query.$or = [
             { clientName: { $regex: search, $options: 'i' } },
             { mobileNumber: { $regex: search, $options: 'i' } },
+            { hotel: { $regex: search, $options: 'i' } },
+            { duty: { $regex: search, $options: 'i' } },
             { bookingId: { $regex: search, $options: 'i' } },
             { carType: { $regex: search, $options: 'i' } },
+            { customCarNumber: { $regex: search, $options: 'i' } },
+            { customDriverName: { $regex: search, $options: 'i' } },
             { itinerary: { $regex: search, $options: 'i' } }
         ];
     }
@@ -58,25 +62,30 @@ const getDRSDuties = asyncHandler(async (req, res) => {
 // @access  Private/AdminOrExecutive
 const createDRSDuty = asyncHandler(async (req, res) => {
     const {
-        company, clientName, mobileNumber, date, time,
-        carType, driver, vehicle, itinerary, revenue, status,
+        company, clientName, mobileNumber, hotel, date, time,
+        carType, customCarNumber, driver, customDriverName, vehicle, itinerary,
+        revenue, cOut, status,
         leadId, bookingId, bookingRef, pickupPoint, duty: dutyText, guestRemarks
     } = req.body;
 
     const duty = await DRSDuty.create({
         company,
         clientName,
-        mobileNumber,
+        mobileNumber: mobileNumber || '',
+        hotel: hotel || '',
         date: date || new Date(),
         time: time || '09:00 AM',
         carType: carType || 'Sedan',
+        customCarNumber: customCarNumber || '',
         driver: driver || null,
+        customDriverName: customDriverName || '',
         vehicle: vehicle || null,
-        itinerary: itinerary || 'City Duty',
+        itinerary: itinerary || dutyText || 'City Duty',
         duty: dutyText || itinerary || 'City Duty',
         pickupPoint: pickupPoint || '',
         revenue: Number(revenue) || 0,
-        status: status || (driver && vehicle ? 'Assigned' : 'Pending'),
+        cOut: cOut || '',
+        status: status || (driver || customDriverName ? 'Assigned' : 'Pending'),
         leadId: leadId || null,
         bookingId: bookingId || null,
         bookingRef: bookingRef || null,

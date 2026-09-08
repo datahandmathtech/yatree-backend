@@ -7,7 +7,7 @@ import {
     Calendar, Car, IndianRupee, MapPin, Search, Filter, AlertTriangle,
     Clock, Phone, ShieldCheck, Share2, HelpCircle, User, Users,
     Globe, Building2, Repeat, CircleDot, XCircle, ChevronLeft, ChevronRight,
-    TrendingUp, BarChart2, BarChart3
+    TrendingUp, BarChart2, BarChart3, Info, CheckSquare, Square
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import jsPDF from 'jspdf';
@@ -26,10 +26,18 @@ const LEAD_STATUSES = ['New', 'Follow-up', 'Quoted', 'Negotiation', 'Confirmed',
 
 const MONTH_TABS = ['All', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
 
-const MONTH_MAP = {
-    'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 'May': '05', 'Jun': '06',
-    'Jul': '07', 'Aug': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
-};
+const VEHICLE_OPTIONS = [
+    'Innova Crysta',
+    'Ertiga',
+    'Swift Dzire',
+    'Tempo Traveller (12 Seater)',
+    'Tempo Traveller (17 Seater)',
+    'Toyota Fortuner',
+    'Sedan',
+    'SUV',
+    'Luxury Car',
+    'Bus'
+];
 
 export default function Leads() {
     const { selectedCompany } = useCompany();
@@ -53,6 +61,7 @@ export default function Leads() {
     // Create / Edit Modal
     const [showModal, setShowModal] = useState(false);
     const [editingLead, setEditingLead] = useState(null);
+    const [previewClientCode, setPreviewClientCode] = useState('');
 
     // Convert to Booking Modal
     const [showConvertModal, setShowConvertModal] = useState(false);
@@ -79,11 +88,18 @@ export default function Leads() {
         leadDate: '',
         travelStartDate: '',
         travelEndDate: '',
-        carType: '',
+        carType: 'Innova Crysta',
         numberOfCars: 1,
         gstMode: 'GST Inclusive',
         status: 'New',
         notes: '',
+        specialRemarks: '',
+        inclusions: {
+            driverAllowance: true,
+            nightAllowance: true,
+            tollParking: true,
+            gstIncluded: true
+        },
         itinerary: [],
         extraCharges: [],
         totalAmount: 0
@@ -140,54 +156,155 @@ export default function Leads() {
         }
     };
 
-    // Itinerary builders
-    const handleItineraryChange = (index, field, value) => {
-        const updated = [...formData.itinerary];
-        updated[index][field] = value;
-
-        if (field === 'amount') {
-            const total = updated.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-            setFormData(prev => ({ ...prev, itinerary: updated, totalAmount: total }));
-        } else {
-            setFormData(prev => ({ ...prev, itinerary: updated }));
+    // Fetch next client code preview when modal opens or leadDate changes
+    const fetchNextClientCodePreview = async (dateVal) => {
+        if (!selectedCompany?._id) return;
+        try {
+            const dateParam = dateVal || new Date().toISOString().split('T')[0];
+            const { data } = await axios.get(`/api/leads/next-client-code/${selectedCompany._id}?date=${dateParam}`);
+            if (data?.clientCode) {
+                setPreviewClientCode(data.clientCode);
+            }
+        } catch (err) {
+            console.error('Error fetching client code preview:', err);
         }
     };
 
-    const addItineraryDay = () => {
+    // Auto-populate itinerary days when travel dates change
+    const handleTravelDateChange = (field, value) => {
+        setFormData(prev => {
+            const updated = { ...prev, [field]: value };
+            const sDate = field === 'travelStartDate' ? value : prev.travelStartDate;
+            const eDate = field === 'travelEndDate' ? value : prev.travelEndDate;
+
+            if (sDate && eDate) {
+                const s = new Date(sDate);
+                const e = new Date(eDate);
+                if (!isNaN(s.getTime()) && !isNaN(e.getTime()) && e >= s) {
+                    const daysCount = Math.max(1, Math.ceil((e - s) / (1000 * 60 * 60 * 24)) + 1);
+                    const newItinerary = [];
+
+                    for (let i = 0; i < daysCount; i++) {
+                        const curDate = new Date(s);
+                        curDate.setDate(curDate.getDate() + i);
+                        const dateStr = curDate.toISOString().split('T')[0];
+
+                        // Keep existing day info if already entered
+                        const existingDay = prev.itinerary[i];
+                        const isApg = existingDay ? existingDay.isApg : (i % 2 === 1);
+                        const rate = existingDay ? (Number(existingDay.rate) || 0) : 0;
+                        const qty = existingDay ? (Number(existingDay.vehicleCount) || updated.numberOfCars || 1) : (updated.numberOfCars || 1);
+
+                        newItinerary.push({
+                            dayNo: i + 1,
+                            date: dateStr,
+                            time: existingDay ? existingDay.time : (isApg ? 'APG' : (i === 0 ? '09:00 AM' : '11:30 AM')),
+                            isApg: isApg,
+                            duty: existingDay ? existingDay.duty : (i === 0 ? 'Airport Pickup & Local Sightseeing' : 'City Tour / Transfer'),
+                            description: existingDay ? existingDay.duty : (i === 0 ? 'Airport Pickup & Local Sightseeing' : 'City Tour / Transfer'),
+                            vehicleType: existingDay?.vehicleType || updated.carType || 'Innova Crysta',
+                            vehicleCount: qty,
+                            quantity: qty,
+                            rate: rate,
+                            amount: existingDay ? (Number(existingDay.amount) || (qty * rate)) : (qty * rate)
+                        });
+                    }
+
+                    const total = newItinerary.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+                    updated.itinerary = newItinerary;
+                    updated.totalAmount = total;
+                }
+            }
+            return updated;
+        });
+    };
+
+    // Itinerary Row Field Handlers
+    const handleItineraryRowChange = (index, field, value) => {
+        const updated = [...formData.itinerary];
+        const row = { ...updated[index] };
+
+        if (field === 'isApg') {
+            row.isApg = value;
+            if (value) {
+                row.time = 'APG';
+            } else if (row.time === 'APG') {
+                row.time = '09:00 AM';
+            }
+        } else if (field === 'rate' || field === 'quantity') {
+            const qty = Number(field === 'quantity' ? value : (row.quantity || row.vehicleCount || 1));
+            const rate = Number(field === 'rate' ? value : (row.rate || 0));
+            row.rate = rate;
+            row.quantity = qty;
+            row.vehicleCount = qty;
+            row.amount = qty * rate;
+        } else if (field === 'amount') {
+            row.amount = Number(value) || 0;
+        } else if (field === 'duty') {
+            row.duty = value;
+            row.description = value;
+        } else {
+            row[field] = value;
+        }
+
+        updated[index] = row;
+        const total = updated.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+        setFormData(prev => ({ ...prev, itinerary: updated, totalAmount: total }));
+    };
+
+    const addAnotherDay = () => {
         let nextDate = '';
-        if (formData.travelStartDate) {
-            const d = new Date(formData.travelStartDate);
-            d.setDate(d.getDate() + formData.itinerary.length);
-            nextDate = d.toISOString().split('T')[0];
+        const len = formData.itinerary.length;
+        if (len > 0 && formData.itinerary[len - 1].date) {
+            const last = new Date(formData.itinerary[len - 1].date);
+            last.setDate(last.getDate() + 1);
+            nextDate = last.toISOString().split('T')[0];
+        } else if (formData.travelStartDate) {
+            const s = new Date(formData.travelStartDate);
+            s.setDate(s.getDate() + len);
+            nextDate = s.toISOString().split('T')[0];
         }
 
         const newDay = {
-            dayNo: formData.itinerary.length + 1,
+            dayNo: len + 1,
             date: nextDate,
             time: '09:00 AM',
+            isApg: false,
             pickupPoint: '',
-            duty: '',
-            description: '',
-            vehicleType: formData.carType || '',
+            duty: 'City Tour / Transfer',
+            description: 'City Tour / Transfer',
+            vehicleType: formData.carType || 'Innova Crysta',
             vehicleCount: formData.numberOfCars || 1,
-            estimatedKm: 0,
-            estimatedHours: 8,
-            amount: 0,
-            inclusions: '',
-            exclusions: '',
-            specialNotes: ''
+            quantity: formData.numberOfCars || 1,
+            rate: 0,
+            amount: 0
         };
 
+        const updated = [...formData.itinerary, newDay];
         setFormData(prev => ({
             ...prev,
-            itinerary: [...prev.itinerary, newDay]
+            itinerary: updated,
+            travelEndDate: nextDate || prev.travelEndDate
         }));
     };
 
     const removeItineraryDay = (index) => {
-        const updated = formData.itinerary.filter((_, i) => i !== index).map((d, i) => ({ ...d, dayNo: i + 1 }));
+        const updated = formData.itinerary
+            .filter((_, i) => i !== index)
+            .map((d, i) => ({ ...d, dayNo: i + 1 }));
         const total = updated.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
         setFormData(prev => ({ ...prev, itinerary: updated, totalAmount: total }));
+    };
+
+    // Toggle Inclusions
+    const handleInclusionToggle = (key) => {
+        setFormData(prev => ({
+            ...prev,
+            inclusions: {
+                ...prev.inclusions,
+                [key]: !prev.inclusions[key]
+            }
+        }));
     };
 
     // Open Modal
@@ -195,6 +312,7 @@ export default function Leads() {
         setPhoneCheckResult(null);
         if (lead) {
             setEditingLead(lead);
+            setPreviewClientCode(lead.clientCode || lead.leadId || '');
             setFormData({
                 clientName: lead.clientName || '',
                 mobileNumber: lead.mobileNumber || '',
@@ -207,18 +325,107 @@ export default function Leads() {
                 leadDate: lead.leadDate ? new Date(lead.leadDate).toISOString().split('T')[0] : '',
                 travelStartDate: lead.travelStartDate ? new Date(lead.travelStartDate).toISOString().split('T')[0] : '',
                 travelEndDate: lead.travelEndDate ? new Date(lead.travelEndDate).toISOString().split('T')[0] : '',
-                carType: lead.carType || '',
+                carType: lead.carType || 'Innova Crysta',
                 numberOfCars: lead.numberOfCars || 1,
                 gstMode: lead.gstMode || 'GST Inclusive',
                 status: lead.status || 'New',
                 notes: lead.notes || '',
-                itinerary: lead.itinerary || [],
+                specialRemarks: lead.specialRemarks || '',
+                inclusions: lead.inclusions || {
+                    driverAllowance: true,
+                    nightAllowance: true,
+                    tollParking: true,
+                    gstIncluded: true
+                },
+                itinerary: (lead.itinerary || []).map((d, i) => ({
+                    dayNo: d.dayNo || i + 1,
+                    date: d.date ? new Date(d.date).toISOString().split('T')[0] : '',
+                    time: d.time || '09:00 AM',
+                    isApg: d.isApg || d.time === 'APG',
+                    duty: d.duty || d.description || 'Standard Duty',
+                    description: d.duty || d.description || 'Standard Duty',
+                    vehicleType: d.vehicleType || lead.carType || 'Innova Crysta',
+                    vehicleCount: d.vehicleCount || lead.numberOfCars || 1,
+                    quantity: d.vehicleCount || lead.numberOfCars || 1,
+                    rate: d.rate || 0,
+                    amount: d.amount || 0
+                })),
                 extraCharges: lead.extraCharges || [],
                 totalAmount: lead.totalAmount || 0
             });
         } else {
             setEditingLead(null);
             const today = new Date().toISOString().split('T')[0];
+            fetchNextClientCodePreview(today);
+
+            const initialItinerary = [
+                {
+                    dayNo: 1,
+                    date: today,
+                    time: '09:00 AM',
+                    isApg: false,
+                    duty: 'Airport Pickup & Local Sightseeing',
+                    description: 'Airport Pickup & Local Sightseeing',
+                    vehicleType: 'Innova Crysta',
+                    vehicleCount: 1,
+                    quantity: 1,
+                    rate: 0,
+                    amount: 0
+                },
+                {
+                    dayNo: 2,
+                    date: today,
+                    time: 'APG',
+                    isApg: true,
+                    duty: 'City Tour / Transfer',
+                    description: 'City Tour / Transfer',
+                    vehicleType: 'Innova Crysta',
+                    vehicleCount: 1,
+                    quantity: 1,
+                    rate: 0,
+                    amount: 0
+                },
+                {
+                    dayNo: 3,
+                    date: today,
+                    time: '11:30 AM',
+                    isApg: false,
+                    duty: 'City Tour / Transfer',
+                    description: 'City Tour / Transfer',
+                    vehicleType: 'Innova Crysta',
+                    vehicleCount: 1,
+                    quantity: 1,
+                    rate: 0,
+                    amount: 0
+                },
+                {
+                    dayNo: 4,
+                    date: today,
+                    time: 'APG',
+                    isApg: true,
+                    duty: 'City Tour / Transfer',
+                    description: 'City Tour / Transfer',
+                    vehicleType: 'Innova Crysta',
+                    vehicleCount: 1,
+                    quantity: 1,
+                    rate: 0,
+                    amount: 0
+                },
+                {
+                    dayNo: 5,
+                    date: today,
+                    time: '02:15 PM',
+                    isApg: false,
+                    duty: 'City Tour / Transfer',
+                    description: 'City Tour / Transfer',
+                    vehicleType: 'Innova Crysta',
+                    vehicleCount: 1,
+                    quantity: 1,
+                    rate: 0,
+                    amount: 0
+                }
+            ];
+
             setFormData({
                 clientName: '',
                 mobileNumber: '',
@@ -236,24 +443,16 @@ export default function Leads() {
                 gstMode: 'GST Inclusive',
                 status: 'New',
                 notes: '',
-                itinerary: [{
-                    dayNo: 1,
-                    date: today,
-                    time: '09:00 AM',
-                    pickupPoint: 'Airport / Hotel',
-                    duty: 'Full Day Sightseeing / Transfer',
-                    description: 'Full Day Sightseeing / Transfer',
-                    vehicleType: 'Innova Crysta',
-                    vehicleCount: 1,
-                    estimatedKm: 100,
-                    estimatedHours: 8,
-                    amount: 3500,
-                    inclusions: 'Driver, Fuel',
-                    exclusions: 'Toll, Parking, Border Tax',
-                    specialNotes: ''
-                }],
+                specialRemarks: '',
+                inclusions: {
+                    driverAllowance: true,
+                    nightAllowance: true,
+                    tollParking: true,
+                    gstIncluded: true
+                },
+                itinerary: initialItinerary,
                 extraCharges: [],
-                totalAmount: 3500
+                totalAmount: 0
             });
         }
         setShowModal(true);
@@ -269,7 +468,7 @@ export default function Leads() {
             };
 
             if (editingLead) {
-                await axios.put(`/api/leads/${editingLead._id}`, payload);
+                await axios.put(`/api/leads/single/${editingLead._id}`, payload);
             } else {
                 await axios.post('/api/leads', payload);
             }
@@ -285,7 +484,7 @@ export default function Leads() {
     const handleDelete = async (id) => {
         if (window.confirm('Are you sure you want to delete this lead?')) {
             try {
-                await axios.delete(`/api/leads/${id}`);
+                await axios.delete(`/api/leads/single/${id}`);
                 fetchLeads();
             } catch (error) {
                 console.error('Error deleting lead:', error);
@@ -346,7 +545,7 @@ export default function Leads() {
         const tableRows = (lead.itinerary || []).map((day, idx) => [
             `Day ${day.dayNo || idx + 1}`,
             day.date ? new Date(day.date).toLocaleDateString('en-IN') : 'TBA',
-            day.time || '09:00 AM',
+            day.isApg ? 'APG' : (day.time || '09:00 AM'),
             day.pickupPoint || 'Hotel / City',
             day.duty || day.description || 'Full Day',
             `Rs. ${(day.amount || 0).toLocaleString('en-IN')}`
@@ -371,11 +570,19 @@ export default function Leads() {
         doc.setTextColor(15, 23, 42);
         doc.text(`Total Package Fare (${lead.gstMode || 'GST Inclusive'}): Rs. ${(lead.totalAmount || 0).toLocaleString('en-IN')}`, 14, finalY + 4);
 
+        // Special Remarks if present
+        if (lead.specialRemarks) {
+            doc.setFontSize(8.5);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(15, 23, 42);
+            doc.text(`Guest Remarks: ${lead.specialRemarks}`, 14, finalY + 11);
+        }
+
         // Terms
         doc.setFontSize(8);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(100, 116, 139);
-        doc.text('Note: Toll, State Tax & Parking extra unless specified. AC off in hills or parked vehicle.', 14, finalY + 12);
+        doc.text('Inclusions: Driver & Night Allowance, Toll & Parking (if specified). AC off in hills/parked.', 14, finalY + (lead.specialRemarks ? 17 : 12));
 
         doc.save(`${(lead.clientName || 'Guest').replace(/\s+/g, '_')}_${lead.clientCode ? lead.clientCode.replace('/', '-') : 'Quotation'}.pdf`);
     };
@@ -390,14 +597,14 @@ export default function Leads() {
                 return;
             }
 
-            const { data } = await axios.post(`/api/leads/${convertingLead._id}/convert-to-booking`, {
+            const { data } = await axios.post(`/api/leads/${convertingLead._id}/convert`, {
                 advancePayment: adv,
                 paymentMode,
                 paymentReference: paymentRef,
                 adminOverrideReason: adminOverride ? adminOverrideReason : ''
             });
 
-            alert(`Booking confirmed successfully! Booking ID: ${data.bookingId}`);
+            alert(`Booking confirmed successfully! Booking ID: ${data.booking?.bookingId || data.bookingId}`);
             setShowConvertModal(false);
             fetchLeads();
         } catch (error) {
@@ -406,7 +613,7 @@ export default function Leads() {
         }
     };
 
-    // Filter leads on client side for source and salesperson
+    // Filter leads on client side
     const filteredLeads = useMemo(() => {
         return leads.filter(lead => {
             if (sourceFilter !== 'All' && lead.source !== sourceFilter) return false;
@@ -452,7 +659,7 @@ export default function Leads() {
         return filteredLeads.slice(start, start + itemsPerPage);
     }, [filteredLeads, currentPage]);
 
-    // Helpers for rendering table cells
+    // Formatters
     const formatCreatedDate = (dateVal) => {
         if (!dateVal) return 'N/A';
         const d = new Date(dateVal);
@@ -612,15 +819,27 @@ export default function Leads() {
         }
     };
 
-    const inputStyle = {
-        background: 'rgba(255,255,255,0.05)',
-        border: '1px solid rgba(255,255,255,0.1)',
-        color: 'white',
-        padding: '10px 14px',
+    // Dark sleek input styles matching the reference image
+    const darkInputStyle = {
+        background: '#0a101d',
+        border: '1px solid rgba(255, 255, 255, 0.12)',
         borderRadius: '8px',
+        color: '#f1f5f9',
+        padding: '10px 14px',
+        fontSize: '13px',
         outline: 'none',
         width: '100%',
-        fontSize: '13px'
+        boxSizing: 'border-box'
+    };
+
+    const labelStyle = {
+        fontSize: '11px',
+        fontWeight: '700',
+        color: 'rgba(255, 255, 255, 0.65)',
+        textTransform: 'uppercase',
+        letterSpacing: '0.4px',
+        display: 'block',
+        marginBottom: '6px'
     };
 
     return (
@@ -817,7 +1036,7 @@ export default function Leads() {
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             style={{
-                                ...inputStyle,
+                                ...darkInputStyle,
                                 paddingLeft: '40px',
                                 background: 'rgba(0,0,0,0.3)',
                                 borderRadius: '10px'
@@ -1178,114 +1397,671 @@ export default function Leads() {
                 </div>
             </div>
 
-            {/* Modal: Create or Edit Lead */}
+            {/* ========================================================================= */}
+            {/* 6. MODAL: Create / Edit Lead & Quotation (Exact Pixel Mockup Alignment)   */}
+            {/* ========================================================================= */}
             <AnimatePresence>
                 {showModal && (
-                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
-                        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 30, opacity: 0 }} className="glass-card" style={{ width: '92%', maxWidth: '850px', maxHeight: '92vh', overflowY: 'auto', background: '#0f172a', padding: '30px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>
-                                <h2 style={{ color: 'white', margin: 0, fontSize: '20px', fontWeight: '800' }}>
-                                    {editingLead ? `Edit Lead (${editingLead.clientCode || editingLead.leadId || 'LK-LEAD'})` : 'Create New Lead & Quotation'}
+                    <div style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(0, 0, 0, 0.82)',
+                        backdropFilter: 'blur(8px)',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        zIndex: 9999,
+                        padding: '16px'
+                    }}>
+                        <motion.div
+                            initial={{ y: 20, opacity: 0, scale: 0.98 }}
+                            animate={{ y: 0, opacity: 1, scale: 1 }}
+                            exit={{ y: 20, opacity: 0, scale: 0.98 }}
+                            style={{
+                                width: '100%',
+                                maxWidth: '1020px',
+                                maxHeight: '94vh',
+                                overflowY: 'auto',
+                                background: '#090f1d',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                borderRadius: '18px',
+                                padding: '26px 30px',
+                                boxShadow: '0 25px 60px rgba(0, 0, 0, 0.9)',
+                                color: '#f8fafc'
+                            }}
+                        >
+                            {/* Modal Header */}
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                flexWrap: 'wrap',
+                                gap: '14px',
+                                marginBottom: '22px',
+                                borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                                paddingBottom: '18px'
+                            }}>
+                                <h2 style={{ color: 'white', margin: 0, fontSize: '22px', fontWeight: '800' }}>
+                                    {editingLead ? 'Edit Lead & Quotation' : 'Create New Lead & Quotation'}
                                 </h2>
-                                <button onClick={() => setShowModal(false)} style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer' }}><X size={20} /></button>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    {/* LEAD ID Badge */}
+                                    <div style={{
+                                        border: '1px solid rgba(56, 189, 248, 0.3)',
+                                        background: 'rgba(56, 189, 248, 0.06)',
+                                        borderRadius: '8px',
+                                        padding: '6px 14px',
+                                        textAlign: 'left'
+                                    }}>
+                                        <div style={{ fontSize: '9px', fontWeight: '700', color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            LEAD ID <Info size={10} color="#38bdf8" />
+                                        </div>
+                                        <div style={{ fontSize: '14px', fontWeight: '900', color: '#38bdf8', marginTop: '2px' }}>
+                                            {previewClientCode || formData.clientCode || '01/01'}
+                                        </div>
+                                    </div>
+
+                                    {/* DATE OF LEAD Box */}
+                                    <div style={{
+                                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                                        background: 'rgba(255, 255, 255, 0.04)',
+                                        borderRadius: '8px',
+                                        padding: '6px 14px',
+                                        display: 'flex',
+                                        flexDirection: 'column'
+                                    }}>
+                                        <div style={{ fontSize: '9px', fontWeight: '700', color: 'rgba(255,255,255,0.5)' }}>
+                                            DATE OF LEAD
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                                            <Calendar size={13} color="var(--primary)" />
+                                            <input
+                                                type="date"
+                                                value={formData.leadDate}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setFormData({ ...formData, leadDate: val });
+                                                    fetchNextClientCodePreview(val);
+                                                }}
+                                                style={{
+                                                    background: 'transparent',
+                                                    border: 'none',
+                                                    color: 'white',
+                                                    fontSize: '13px',
+                                                    fontWeight: '700',
+                                                    outline: 'none',
+                                                    cursor: 'pointer'
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Close Button */}
+                                    <button
+                                        onClick={() => setShowModal(false)}
+                                        style={{
+                                            background: 'rgba(255,255,255,0.06)',
+                                            border: 'none',
+                                            color: 'rgba(255,255,255,0.8)',
+                                            width: '34px',
+                                            height: '34px',
+                                            borderRadius: '8px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        <X size={18} />
+                                    </button>
+                                </div>
                             </div>
 
-                            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                {/* Duplicate Phone Warning Banner */}
-                                {phoneCheckResult && phoneCheckResult.exists && (
-                                    <div style={{ background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', borderRadius: '10px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <AlertTriangle size={18} color="#facc15" />
-                                        <div style={{ fontSize: '12px', color: '#fef08a' }}>
-                                            <strong>Existing Customer Detected:</strong> This phone number has {phoneCheckResult.count} previous lead(s)/booking(s) on file.
-                                        </div>
+                            {/* Duplicate Phone Warning Banner */}
+                            {phoneCheckResult && phoneCheckResult.exists && (
+                                <div style={{
+                                    background: 'rgba(234, 179, 8, 0.1)',
+                                    border: '1px solid rgba(234, 179, 8, 0.3)',
+                                    borderRadius: '10px',
+                                    padding: '12px 16px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '10px',
+                                    marginBottom: '20px'
+                                }}>
+                                    <AlertTriangle size={18} color="#facc15" />
+                                    <div style={{ fontSize: '12px', color: '#fef08a' }}>
+                                        <strong>Existing Customer Detected:</strong> This phone number has {phoneCheckResult.count} previous lead(s)/booking(s) on file.
                                     </div>
-                                )}
+                                </div>
+                            )}
 
-                                {/* 1. Client & Enquiry Source */}
+                            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+                                {/* ========================================== */}
+                                {/* SECTION 1: CLIENT & SOURCE DETAILS        */}
+                                {/* ========================================== */}
                                 <div>
-                                    <h3 style={{ color: 'var(--primary)', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '12px' }}>1. Client & Source Details</h3>
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                                        <span style={{
+                                            width: '20px',
+                                            height: '20px',
+                                            borderRadius: '50%',
+                                            background: '#fbbf24',
+                                            color: '#000',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontWeight: '900',
+                                            fontSize: '11px'
+                                        }}>
+                                            1
+                                        </span>
+                                        <span style={{ color: '#fbbf24', fontSize: '12px', fontWeight: '800', letterSpacing: '0.6px', textTransform: 'uppercase' }}>
+                                            Client & Source Details
+                                        </span>
+                                    </div>
+
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
                                         <div>
-                                            <label style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', display: 'block', marginBottom: '4px' }}>Guest / Client Name *</label>
-                                            <input required type="text" value={formData.clientName} onChange={e => setFormData({ ...formData, clientName: e.target.value })} style={inputStyle} placeholder="e.g. Rahul Sharma" />
+                                            <label style={labelStyle}>Guest / Client Name *</label>
+                                            <input
+                                                required
+                                                type="text"
+                                                value={formData.clientName}
+                                                onChange={e => setFormData({ ...formData, clientName: e.target.value })}
+                                                style={darkInputStyle}
+                                                placeholder="e.g. Rahul Sharma"
+                                            />
                                         </div>
                                         <div>
-                                            <label style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', display: 'block', marginBottom: '4px' }}>Mobile Number *</label>
-                                            <input required type="text" value={formData.mobileNumber} onChange={handleMobileChange} style={inputStyle} placeholder="e.g. 9876543210" />
+                                            <label style={labelStyle}>Mobile Number *</label>
+                                            <input
+                                                required
+                                                type="text"
+                                                value={formData.mobileNumber}
+                                                onChange={handleMobileChange}
+                                                style={darkInputStyle}
+                                                placeholder="e.g. 9876543210"
+                                            />
                                         </div>
                                         <div>
-                                            <label style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', display: 'block', marginBottom: '4px' }}>Enquiry Source</label>
-                                            <select value={formData.source} onChange={e => setFormData({ ...formData, source: e.target.value })} className="premium-compact-input" style={{ width: '100%', height: '40px' }}>
-                                                {LEAD_SOURCES.map(src => <option key={src} value={src}>{src}</option>)}
+                                            <label style={labelStyle}>Enquiry Source</label>
+                                            <select
+                                                value={formData.source}
+                                                onChange={e => setFormData({ ...formData, source: e.target.value })}
+                                                style={{ ...darkInputStyle, cursor: 'pointer' }}
+                                            >
+                                                {LEAD_SOURCES.map(src => <option key={src} value={src} style={{ background: '#090f1d' }}>{src}</option>)}
                                             </select>
                                         </div>
                                         <div>
-                                            <label style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', display: 'block', marginBottom: '4px' }}>GST Mode</label>
-                                            <select value={formData.gstMode} onChange={e => setFormData({ ...formData, gstMode: e.target.value })} className="premium-compact-input" style={{ width: '100%', height: '40px' }}>
-                                                {GST_MODES.map(mode => <option key={mode} value={mode}>{mode}</option>)}
+                                            <label style={labelStyle}>GST Mode</label>
+                                            <select
+                                                value={formData.gstMode}
+                                                onChange={e => setFormData({ ...formData, gstMode: e.target.value })}
+                                                style={{ ...darkInputStyle, cursor: 'pointer' }}
+                                            >
+                                                {GST_MODES.map(mode => <option key={mode} value={mode} style={{ background: '#090f1d' }}>{mode}</option>)}
                                             </select>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* 2. Tour Specs */}
+                                {/* ========================================== */}
+                                {/* SECTION 2: TRAVEL & QUOTATION DETAILS     */}
+                                {/* ========================================== */}
                                 <div>
-                                    <h3 style={{ color: 'var(--primary)', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '12px' }}>2. Travel Schedule & Vehicle</h3>
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                                        <span style={{
+                                            width: '20px',
+                                            height: '20px',
+                                            borderRadius: '50%',
+                                            background: '#fbbf24',
+                                            color: '#000',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontWeight: '900',
+                                            fontSize: '11px'
+                                        }}>
+                                            2
+                                        </span>
+                                        <span style={{ color: '#fbbf24', fontSize: '12px', fontWeight: '800', letterSpacing: '0.6px', textTransform: 'uppercase' }}>
+                                            Travel & Quotation Details
+                                        </span>
+                                    </div>
+
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
                                         <div>
-                                            <label style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', display: 'block', marginBottom: '4px' }}>Travel Start Date *</label>
-                                            <input required type="date" value={formData.travelStartDate} onChange={e => setFormData({ ...formData, travelStartDate: e.target.value })} style={inputStyle} />
+                                            <label style={labelStyle}>Travel Start Date *</label>
+                                            <input
+                                                required
+                                                type="date"
+                                                value={formData.travelStartDate}
+                                                onChange={e => handleTravelDateChange('travelStartDate', e.target.value)}
+                                                style={darkInputStyle}
+                                            />
                                         </div>
                                         <div>
-                                            <label style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', display: 'block', marginBottom: '4px' }}>Travel End Date *</label>
-                                            <input required type="date" value={formData.travelEndDate} onChange={e => setFormData({ ...formData, travelEndDate: e.target.value })} style={inputStyle} />
+                                            <label style={labelStyle}>Travel End Date *</label>
+                                            <input
+                                                required
+                                                type="date"
+                                                value={formData.travelEndDate}
+                                                onChange={e => handleTravelDateChange('travelEndDate', e.target.value)}
+                                                style={darkInputStyle}
+                                            />
                                         </div>
                                         <div>
-                                            <label style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', display: 'block', marginBottom: '4px' }}>Vehicle Model *</label>
-                                            <input required type="text" placeholder="e.g. Innova Crysta" value={formData.carType} onChange={e => setFormData({ ...formData, carType: e.target.value })} style={inputStyle} />
+                                            <label style={labelStyle}>Vehicle Model *</label>
+                                            <select
+                                                value={formData.carType}
+                                                onChange={e => setFormData({ ...formData, carType: e.target.value })}
+                                                style={{ ...darkInputStyle, cursor: 'pointer' }}
+                                            >
+                                                {VEHICLE_OPTIONS.map(v => (
+                                                    <option key={v} value={v} style={{ background: '#090f1d' }}>{v}</option>
+                                                ))}
+                                            </select>
                                         </div>
                                         <div>
-                                            <label style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', display: 'block', marginBottom: '4px' }}>Number of Vehicles</label>
-                                            <input required type="number" min="1" value={formData.numberOfCars} onChange={e => setFormData({ ...formData, numberOfCars: Number(e.target.value) })} style={inputStyle} />
+                                            <label style={labelStyle}>Number of Vehicles *</label>
+                                            <input
+                                                required
+                                                type="number"
+                                                min="1"
+                                                value={formData.numberOfCars}
+                                                onChange={e => setFormData({ ...formData, numberOfCars: Number(e.target.value) || 1 })}
+                                                style={darkInputStyle}
+                                            />
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* 3. Day-wise Itinerary */}
-                                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                                        <h3 style={{ color: 'white', margin: 0, fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <MapPin size={16} color="var(--primary)" /> Day-wise Itinerary & Pricing
-                                        </h3>
-                                        <button type="button" onClick={addItineraryDay} style={{ padding: '6px 12px', background: 'rgba(245, 158, 11, 0.15)', color: 'var(--primary)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '700' }}>+ Add Day</button>
+                                {/* ========================================== */}
+                                {/* SECTION 3: DAY-WISE ITINERARY & PRICING    */}
+                                {/* ========================================== */}
+                                <div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                                        <span style={{
+                                            width: '20px',
+                                            height: '20px',
+                                            borderRadius: '50%',
+                                            background: '#fbbf24',
+                                            color: '#000',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontWeight: '900',
+                                            fontSize: '11px'
+                                        }}>
+                                            3
+                                        </span>
+                                        <span style={{ color: '#fbbf24', fontSize: '12px', fontWeight: '800', letterSpacing: '0.6px', textTransform: 'uppercase' }}>
+                                            Day-wise Itinerary & Pricing
+                                        </span>
                                     </div>
 
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                        {formData.itinerary.map((day, idx) => (
-                                            <div key={idx} style={{ display: 'grid', gridTemplateColumns: '40px 140px 100px 1fr 120px 30px', gap: '8px', alignItems: 'center' }}>
-                                                <div style={{ color: 'var(--primary)', fontWeight: 'bold', fontSize: '12px' }}>D{idx + 1}</div>
-                                                <input type="date" value={day.date ? new Date(day.date).toISOString().split('T')[0] : ''} onChange={e => handleItineraryChange(idx, 'date', e.target.value)} style={{ ...inputStyle, padding: '8px' }} />
-                                                <input type="text" placeholder="09:00 AM" value={day.time || ''} onChange={e => handleItineraryChange(idx, 'time', e.target.value)} style={{ ...inputStyle, padding: '8px' }} />
-                                                <input required type="text" placeholder="Duty/Route (e.g. Udaipur Sightseeing)" value={day.duty || day.description} onChange={e => handleItineraryChange(idx, 'duty', e.target.value)} style={{ ...inputStyle, padding: '8px' }} />
-                                                <input required type="number" min="0" placeholder="Fare ₹" value={day.amount} onChange={e => handleItineraryChange(idx, 'amount', e.target.value)} style={{ ...inputStyle, padding: '8px' }} />
-                                                <button type="button" onClick={() => removeItineraryDay(idx)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0 }}><Trash2 size={16} /></button>
-                                            </div>
-                                        ))}
+                                    {/* Day-wise Table */}
+                                    <div style={{
+                                        background: 'rgba(0,0,0,0.2)',
+                                        borderRadius: '12px',
+                                        border: '1px solid rgba(255,255,255,0.08)',
+                                        overflowX: 'auto'
+                                    }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '820px' }}>
+                                            <thead style={{ background: '#0a101d', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                                                <tr>
+                                                    <th style={{ padding: '12px 10px', fontSize: '11px', fontWeight: '700', color: 'rgba(255,255,255,0.6)' }}>DAY</th>
+                                                    <th style={{ padding: '12px 10px', fontSize: '11px', fontWeight: '700', color: 'rgba(255,255,255,0.6)' }}>DATE</th>
+                                                    <th style={{ padding: '12px 10px', fontSize: '11px', fontWeight: '700', color: 'rgba(255,255,255,0.6)' }}>TIME (Optional) ⓘ</th>
+                                                    <th style={{ padding: '12px 10px', fontSize: '11px', fontWeight: '700', color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>APG ⓘ</th>
+                                                    <th style={{ padding: '12px 10px', fontSize: '11px', fontWeight: '700', color: 'rgba(255,255,255,0.6)' }}>ROUTE / ITINERARY</th>
+                                                    <th style={{ padding: '12px 10px', fontSize: '11px', fontWeight: '700', color: 'rgba(255,255,255,0.6)' }}>VEHICLE</th>
+                                                    <th style={{ padding: '12px 10px', fontSize: '11px', fontWeight: '700', color: 'rgba(255,255,255,0.6)' }}>QTY</th>
+                                                    <th style={{ padding: '12px 10px', fontSize: '11px', fontWeight: '700', color: 'rgba(255,255,255,0.6)' }}>RATE (₹)</th>
+                                                    <th style={{ padding: '12px 10px', fontSize: '11px', fontWeight: '700', color: 'rgba(255,255,255,0.6)' }}>AMOUNT (₹)</th>
+                                                    <th style={{ padding: '12px 10px', fontSize: '11px', fontWeight: '700', color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>ACTION</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {formData.itinerary.map((day, idx) => (
+                                                    <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                                        {/* DAY Badge */}
+                                                        <td style={{ padding: '10px' }}>
+                                                            <span style={{
+                                                                background: '#fbbf24',
+                                                                color: '#000',
+                                                                fontWeight: '900',
+                                                                fontSize: '11px',
+                                                                padding: '4px 8px',
+                                                                borderRadius: '6px',
+                                                                display: 'inline-block'
+                                                            }}>
+                                                                D{day.dayNo || idx + 1}
+                                                            </span>
+                                                        </td>
+
+                                                        {/* DATE */}
+                                                        <td style={{ padding: '10px', minWidth: '130px' }}>
+                                                            <input
+                                                                type="date"
+                                                                value={day.date ? new Date(day.date).toISOString().split('T')[0] : ''}
+                                                                onChange={e => handleItineraryRowChange(idx, 'date', e.target.value)}
+                                                                style={{ ...darkInputStyle, padding: '6px 8px', fontSize: '12px' }}
+                                                            />
+                                                        </td>
+
+                                                        {/* TIME */}
+                                                        <td style={{ padding: '10px', minWidth: '110px' }}>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="09:00 AM"
+                                                                value={day.isApg ? 'APG' : (day.time || '')}
+                                                                disabled={day.isApg}
+                                                                onChange={e => handleItineraryRowChange(idx, 'time', e.target.value)}
+                                                                style={{
+                                                                    ...darkInputStyle,
+                                                                    padding: '6px 8px',
+                                                                    fontSize: '12px',
+                                                                    color: day.isApg ? '#fbbf24' : 'white',
+                                                                    fontWeight: day.isApg ? '800' : 'normal'
+                                                                }}
+                                                            />
+                                                        </td>
+
+                                                        {/* APG Checkbox */}
+                                                        <td style={{ padding: '10px', textAlign: 'center' }}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={!!day.isApg}
+                                                                onChange={e => handleItineraryRowChange(idx, 'isApg', e.target.checked)}
+                                                                style={{
+                                                                    width: '16px',
+                                                                    height: '16px',
+                                                                    accentColor: '#fbbf24',
+                                                                    cursor: 'pointer'
+                                                                }}
+                                                            />
+                                                        </td>
+
+                                                        {/* ROUTE / ITINERARY */}
+                                                        <td style={{ padding: '10px', minWidth: '220px' }}>
+                                                            <input
+                                                                required
+                                                                type="text"
+                                                                placeholder="e.g. Airport Pickup & Local Sightseeing"
+                                                                value={day.duty || day.description || ''}
+                                                                onChange={e => handleItineraryRowChange(idx, 'duty', e.target.value)}
+                                                                style={{ ...darkInputStyle, padding: '6px 10px', fontSize: '12px' }}
+                                                            />
+                                                        </td>
+
+                                                        {/* VEHICLE */}
+                                                        <td style={{ padding: '10px', minWidth: '140px' }}>
+                                                            <select
+                                                                value={day.vehicleType || formData.carType}
+                                                                onChange={e => handleItineraryRowChange(idx, 'vehicleType', e.target.value)}
+                                                                style={{ ...darkInputStyle, padding: '6px 8px', fontSize: '12px', cursor: 'pointer' }}
+                                                            >
+                                                                {VEHICLE_OPTIONS.map(v => (
+                                                                    <option key={v} value={v} style={{ background: '#090f1d' }}>{v}</option>
+                                                                ))}
+                                                            </select>
+                                                        </td>
+
+                                                        {/* QTY */}
+                                                        <td style={{ padding: '10px', width: '65px' }}>
+                                                            <input
+                                                                required
+                                                                type="number"
+                                                                min="1"
+                                                                value={day.quantity || day.vehicleCount || 1}
+                                                                onChange={e => handleItineraryRowChange(idx, 'quantity', e.target.value)}
+                                                                style={{ ...darkInputStyle, padding: '6px 8px', fontSize: '12px', textAlign: 'center' }}
+                                                            />
+                                                        </td>
+
+                                                        {/* RATE (₹) */}
+                                                        <td style={{ padding: '10px', width: '90px' }}>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                placeholder="0"
+                                                                value={day.rate ?? 0}
+                                                                onChange={e => handleItineraryRowChange(idx, 'rate', e.target.value)}
+                                                                style={{ ...darkInputStyle, padding: '6px 8px', fontSize: '12px', textAlign: 'right' }}
+                                                            />
+                                                        </td>
+
+                                                        {/* AMOUNT (₹) */}
+                                                        <td style={{ padding: '10px', width: '95px' }}>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                value={day.amount ?? 0}
+                                                                onChange={e => handleItineraryRowChange(idx, 'amount', e.target.value)}
+                                                                style={{ ...darkInputStyle, padding: '6px 8px', fontSize: '12px', textAlign: 'right', fontWeight: '700' }}
+                                                            />
+                                                        </td>
+
+                                                        {/* ACTION */}
+                                                        <td style={{ padding: '10px', textAlign: 'center' }}>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => removeItineraryDay(idx)}
+                                                                style={{
+                                                                    background: 'transparent',
+                                                                    border: 'none',
+                                                                    color: '#ef4444',
+                                                                    cursor: 'pointer',
+                                                                    padding: '4px'
+                                                                }}
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    {/* Bottom Sub-bar: + Add Another Day & Total */}
+                                    <div style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        marginTop: '12px',
+                                        flexWrap: 'wrap',
+                                        gap: '12px'
+                                    }}>
+                                        <button
+                                            type="button"
+                                            onClick={addAnotherDay}
+                                            style={{
+                                                background: 'rgba(245, 158, 11, 0.08)',
+                                                border: '1px solid rgba(245, 158, 11, 0.35)',
+                                                color: 'var(--primary)',
+                                                borderRadius: '8px',
+                                                padding: '8px 18px',
+                                                fontSize: '13px',
+                                                fontWeight: '800',
+                                                cursor: 'pointer',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '6px'
+                                            }}
+                                        >
+                                            <Plus size={16} /> Add Another Day
+                                        </button>
+
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '16px',
+                                            background: '#0a101d',
+                                            border: '1px solid rgba(255,255,255,0.1)',
+                                            borderRadius: '10px',
+                                            padding: '8px 20px'
+                                        }}>
+                                            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', fontWeight: '600' }}>
+                                                Total Quoted Fare ({formData.gstMode})
+                                            </span>
+                                            <span style={{ fontSize: '22px', fontWeight: '900', color: '#fbbf24' }}>
+                                                ₹{formData.totalAmount.toLocaleString('en-IN')}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Total Fare */}
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', padding: '16px', background: 'rgba(245, 158, 11, 0.06)', borderRadius: '10px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
-                                    <div style={{ textAlign: 'right' }}>
-                                        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>Total Quoted Fare ({formData.gstMode})</div>
-                                        <div style={{ color: 'var(--primary)', fontSize: '26px', fontWeight: '900' }}>₹{formData.totalAmount.toLocaleString('en-IN')}</div>
+                                {/* ========================================== */}
+                                {/* SECTION 4: REMARKS & INCLUSIONS (2-COL)   */}
+                                {/* ========================================== */}
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+                                    {/* Left: Any Remark / Special Request of Guest */}
+                                    <div style={{
+                                        background: '#0a101d',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                        borderRadius: '12px',
+                                        padding: '16px'
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+                                            <span style={{ fontSize: '12px', fontWeight: '700', color: 'white' }}>
+                                                Any Remark / Special Request of Guest
+                                            </span>
+                                            <Info size={13} color="rgba(255,255,255,0.4)" />
+                                        </div>
+
+                                        <textarea
+                                            maxLength={500}
+                                            rows={4}
+                                            placeholder="e.g. Have elderly travellers, need wheelchair assistance at airport. Prefer Non-AC for hill areas. Any other special request..."
+                                            value={formData.specialRemarks}
+                                            onChange={e => setFormData({ ...formData, specialRemarks: e.target.value })}
+                                            style={{
+                                                ...darkInputStyle,
+                                                resize: 'none',
+                                                lineHeight: '1.5',
+                                                background: 'transparent',
+                                                border: 'none',
+                                                padding: 0
+                                            }}
+                                        />
+
+                                        <div style={{ textAlign: 'right', fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '6px' }}>
+                                            {(formData.specialRemarks || '').length}/500
+                                        </div>
+                                    </div>
+
+                                    {/* Right: Trip Inclusion Remarks */}
+                                    <div style={{
+                                        background: '#0a101d',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                        borderRadius: '12px',
+                                        padding: '16px'
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px' }}>
+                                            <span style={{ fontSize: '12px', fontWeight: '700', color: 'white' }}>
+                                                Trip Inclusion Remarks
+                                            </span>
+                                            <Info size={13} color="rgba(255,255,255,0.4)" />
+                                        </div>
+
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                            {[
+                                                { key: 'driverAllowance', label: 'Driver allowance included' },
+                                                { key: 'nightAllowance', label: 'Night allowance included' },
+                                                { key: 'tollParking', label: 'Toll & parking charges included' },
+                                                { key: 'gstIncluded', label: 'GST prices included' }
+                                            ].map(({ key, label }) => (
+                                                <label
+                                                    key={key}
+                                                    onClick={() => handleInclusionToggle(key)}
+                                                    style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '10px',
+                                                        fontSize: '13px',
+                                                        color: formData.inclusions?.[key] ? '#f1f5f9' : 'rgba(255,255,255,0.5)',
+                                                        cursor: 'pointer',
+                                                        userSelect: 'none'
+                                                    }}
+                                                >
+                                                    <div style={{
+                                                        width: '18px',
+                                                        height: '18px',
+                                                        borderRadius: '4px',
+                                                        background: formData.inclusions?.[key] ? '#fbbf24' : 'rgba(255,255,255,0.08)',
+                                                        border: `1px solid ${formData.inclusions?.[key] ? '#fbbf24' : 'rgba(255,255,255,0.2)'}`,
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        color: '#000',
+                                                        fontSize: '12px',
+                                                        fontWeight: '900'
+                                                    }}>
+                                                        {formData.inclusions?.[key] && '✓'}
+                                                    </div>
+                                                    <span>{label}</span>
+                                                </label>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Actions */}
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                                    <button type="button" onClick={() => setShowModal(false)} style={{ padding: '10px 20px', background: 'transparent', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', cursor: 'pointer' }}>Cancel</button>
-                                    <button type="submit" className="primary-btn" style={{ padding: '10px 25px' }}>{editingLead ? 'Update Lead' : 'Save & Generate Lead'}</button>
+                                {/* ========================================== */}
+                                {/* FOOTER ACTIONS                            */}
+                                {/* ========================================== */}
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    paddingTop: '16px',
+                                    borderTop: '1px solid rgba(255,255,255,0.08)',
+                                    flexWrap: 'wrap',
+                                    gap: '14px'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: 'rgba(255,255,255,0.5)' }}>
+                                        <Info size={14} color="#38bdf8" />
+                                        <span>Rates and amounts are indicative. You can modify them as per the discussion with the client.</span>
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: '10px' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowModal(false)}
+                                            style={{
+                                                padding: '10px 22px',
+                                                background: '#0a101d',
+                                                color: 'white',
+                                                border: '1px solid rgba(255,255,255,0.15)',
+                                                borderRadius: '8px',
+                                                fontSize: '13px',
+                                                fontWeight: '600',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            style={{
+                                                padding: '10px 24px',
+                                                background: '#fbbf24',
+                                                color: '#000',
+                                                border: 'none',
+                                                borderRadius: '8px',
+                                                fontSize: '13px',
+                                                fontWeight: '800',
+                                                cursor: 'pointer',
+                                                boxShadow: '0 4px 14px rgba(251, 191, 36, 0.3)'
+                                            }}
+                                        >
+                                            {editingLead ? 'Update Lead' : 'Save & Generate Lead'}
+                                        </button>
+                                    </div>
                                 </div>
                             </form>
                         </motion.div>
@@ -1322,7 +2098,7 @@ export default function Leads() {
                                         placeholder="e.g. 5000"
                                         value={advancePayment}
                                         onChange={e => setAdvancePayment(e.target.value)}
-                                        style={{ ...inputStyle, fontSize: '16px', fontWeight: 'bold' }}
+                                        style={{ ...darkInputStyle, fontSize: '16px', fontWeight: 'bold' }}
                                     />
                                 </div>
 
@@ -1338,7 +2114,7 @@ export default function Leads() {
 
                                 <div>
                                     <label style={{ fontSize: '12px', color: 'rgba(255,255,255,0.8)', display: 'block', marginBottom: '4px' }}>Transaction Ref / UTR (Optional)</label>
-                                    <input type="text" placeholder="e.g. UTR12345678" value={paymentRef} onChange={e => setPaymentRef(e.target.value)} style={inputStyle} />
+                                    <input type="text" placeholder="e.g. UTR12345678" value={paymentRef} onChange={e => setPaymentRef(e.target.value)} style={darkInputStyle} />
                                 </div>
 
                                 {/* Admin Override if 0 advance */}
@@ -1353,7 +2129,7 @@ export default function Leads() {
                                             placeholder="Reason for zero advance (e.g. Corporate Client)..."
                                             value={adminOverrideReason}
                                             onChange={e => setAdminOverrideReason(e.target.value)}
-                                            style={{ ...inputStyle, marginTop: '8px', fontSize: '12px' }}
+                                            style={{ ...darkInputStyle, marginTop: '8px', fontSize: '12px' }}
                                         />
                                     )}
                                 </div>

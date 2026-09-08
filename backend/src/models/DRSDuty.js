@@ -26,7 +26,11 @@ const drsDutySchema = new mongoose.Schema({
     },
     mobileNumber: {
         type: String,
-        required: true
+        default: ''
+    },
+    hotel: {
+        type: String,
+        default: ''
     },
     date: {
         type: Date,
@@ -50,12 +54,20 @@ const drsDutySchema = new mongoose.Schema({
     },
     carType: {
         type: String,
-        required: true
+        default: 'Sedan'
+    },
+    customCarNumber: {
+        type: String,
+        default: ''
     },
     driver: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         default: null
+    },
+    customDriverName: {
+        type: String,
+        default: ''
     },
     vehicle: {
         type: mongoose.Schema.Types.ObjectId,
@@ -64,12 +76,15 @@ const drsDutySchema = new mongoose.Schema({
     },
     itinerary: {
         type: String,
-        required: true
+        default: ''
     },
     revenue: {
         type: Number,
-        required: true,
         default: 0
+    },
+    cOut: {
+        type: String,
+        default: ''
     },
     paymentStatus: {
         type: String,
@@ -83,7 +98,7 @@ const drsDutySchema = new mongoose.Schema({
     },
     isDirectBooking: {
         type: Boolean,
-        default: false
+        default: true
     },
     guestRemarks: {
         type: String,

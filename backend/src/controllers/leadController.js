@@ -4,8 +4,17 @@ const Booking = require('../models/Booking');
 const Client = require('../models/Client');
 const LedgerEntry = require('../models/LedgerEntry');
 const Company = require('../models/Company');
-const { getNextSequence, getNextClientCode } = require('../models/Sequence');
+const { getNextSequence, getNextClientCode, previewNextClientCode } = require('../models/Sequence');
 const asyncHandler = require('express-async-handler');
+
+// @desc    Preview next client code for a company
+// @route   GET /api/leads/next-client-code/:companyId
+// @access  Private/AdminOrExecutive
+const getNextClientCodePreview = asyncHandler(async (req, res) => {
+    const { date } = req.query;
+    const code = await previewNextClientCode(req.params.companyId, date ? new Date(date) : new Date());
+    res.json({ clientCode: code });
+});
 
 // @desc    Get all leads for a company
 // @route   GET /api/leads/:companyId
@@ -104,7 +113,8 @@ const createLead = asyncHandler(async (req, res) => {
     const {
         company, clientName, mobileNumber, alternateMobile, email, gstin,
         source, reference, salesPerson, leadDate, travelStartDate, travelEndDate,
-        carType, numberOfCars, itinerary, extraCharges, totalAmount, gstMode, notes
+        carType, numberOfCars, itinerary, extraCharges, totalAmount, gstMode, notes,
+        specialRemarks, inclusions
     } = req.body;
 
     const leadDateObj = leadDate ? new Date(leadDate) : new Date();
@@ -115,15 +125,17 @@ const createLead = asyncHandler(async (req, res) => {
     const formattedItinerary = (itinerary || []).map((day, idx) => ({
         dayNo: day.dayNo || (idx + 1),
         date: day.date,
-        time: day.time || '09:00 AM',
+        time: day.isApg ? 'APG' : (day.time || '09:00 AM'),
+        isApg: !!day.isApg,
         pickupPoint: day.pickupPoint || '',
-        duty: day.duty || day.description || '',
-        description: day.description || day.duty || 'Standard Duty',
+        duty: day.duty || day.route || day.description || '',
+        description: day.duty || day.route || day.description || 'Standard Duty',
         vehicleType: day.vehicleType || carType || '',
-        vehicleCount: day.vehicleCount || 1,
+        vehicleCount: Number(day.vehicleCount || day.quantity) || 1,
+        rate: Number(day.rate) || 0,
+        amount: Number(day.amount) || ((Number(day.rate) || 0) * (Number(day.vehicleCount || day.quantity) || 1)),
         estimatedKm: Number(day.estimatedKm) || 0,
         estimatedHours: Number(day.estimatedHours) || 0,
-        amount: Number(day.amount) || 0,
         inclusions: day.inclusions || '',
         exclusions: day.exclusions || '',
         specialNotes: day.specialNotes || ''
@@ -152,7 +164,14 @@ const createLead = asyncHandler(async (req, res) => {
         totalAmount: Number(totalAmount) || 0,
         gstMode: gstMode || 'GST Inclusive',
         status: 'New',
-        notes
+        notes,
+        specialRemarks: specialRemarks || '',
+        inclusions: inclusions || {
+            driverAllowance: true,
+            nightAllowance: true,
+            tollParking: true,
+            gstIncluded: true
+        }
     });
 
     res.status(201).json(lead);
@@ -396,5 +415,6 @@ module.exports = {
     createLead,
     updateLead,
     deleteLead,
-    convertToBooking
+    convertToBooking,
+    getNextClientCodePreview
 };
