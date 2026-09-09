@@ -228,15 +228,27 @@ export default function Leads() {
     // Auto-populate itinerary days when travel dates change
     const handleTravelDateChange = (field, value) => {
         setFormData(prev => {
-            const updated = { ...prev, [field]: value };
-            const sDate = field === 'travelStartDate' ? value : prev.travelStartDate;
-            const eDate = field === 'travelEndDate' ? value : prev.travelEndDate;
+            let sDate = field === 'travelStartDate' ? value : prev.travelStartDate;
+            let eDate = field === 'travelEndDate' ? value : prev.travelEndDate;
+
+            if (field === 'travelStartDate' && (!eDate || eDate < value)) {
+                eDate = value;
+            } else if (field === 'travelEndDate' && (!sDate || value < sDate)) {
+                sDate = value;
+            }
+
+            const updated = {
+                ...prev,
+                [field]: value,
+                travelStartDate: sDate,
+                travelEndDate: eDate
+            };
 
             if (sDate && eDate) {
-                const s = new Date(sDate);
-                const e = new Date(eDate);
+                const s = new Date(sDate + 'T00:00:00');
+                const e = new Date(eDate + 'T00:00:00');
                 if (!isNaN(s.getTime()) && !isNaN(e.getTime()) && e >= s) {
-                    const daysCount = Math.max(1, Math.ceil((e - s) / (1000 * 60 * 60 * 24)) + 1);
+                    const daysCount = Math.max(1, Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1);
                     const newItinerary = [];
 
                     for (let i = 0; i < daysCount; i++) {
@@ -246,17 +258,17 @@ export default function Leads() {
 
                         // Keep existing day info if already entered
                         const existingDay = prev.itinerary[i];
-                        const isApg = existingDay ? existingDay.isApg : (i % 2 === 1);
+                        const isApg = existingDay ? existingDay.isApg : false;
                         const rate = existingDay ? (Number(existingDay.rate) || 0) : 0;
-                        const qty = existingDay ? (Number(existingDay.vehicleCount) || updated.numberOfCars || 1) : (updated.numberOfCars || 1);
+                        const qty = existingDay ? (Number(existingDay.quantity || existingDay.vehicleCount) || updated.numberOfCars || 1) : (updated.numberOfCars || 1);
 
                         newItinerary.push({
                             dayNo: i + 1,
                             date: dateStr,
-                            time: existingDay ? existingDay.time : (isApg ? 'APG' : (i === 0 ? '09:00 AM' : '11:30 AM')),
+                            time: existingDay?.time || (isApg ? 'APG' : (i === 0 ? '09:00 AM' : '10:00 AM')),
                             isApg: isApg,
-                            duty: existingDay ? existingDay.duty : (i === 0 ? 'Airport Pickup & Local Sightseeing' : 'City Tour / Transfer'),
-                            description: existingDay ? existingDay.duty : (i === 0 ? 'Airport Pickup & Local Sightseeing' : 'City Tour / Transfer'),
+                            duty: existingDay?.duty || (i === 0 ? 'Airport Pickup & Local Sightseeing' : 'City Tour / Transfer'),
+                            description: existingDay?.description || existingDay?.duty || (i === 0 ? 'Airport Pickup & Local Sightseeing' : 'City Tour / Transfer'),
                             vehicleType: existingDay?.vehicleType || updated.carType || 'Innova Crysta',
                             vehicleCount: qty,
                             quantity: qty,
@@ -348,7 +360,14 @@ export default function Leads() {
             .filter((_, i) => i !== index)
             .map((d, i) => ({ ...d, dayNo: i + 1 }));
         const total = updated.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-        setFormData(prev => ({ ...prev, itinerary: updated, totalAmount: total }));
+        const lastDay = updated[updated.length - 1];
+        const newEndDate = lastDay?.date || formData.travelStartDate;
+        setFormData(prev => ({
+            ...prev,
+            itinerary: updated,
+            travelEndDate: newEndDate,
+            totalAmount: total
+        }));
     };
 
     // Toggle Inclusions
@@ -421,58 +440,6 @@ export default function Leads() {
                     isApg: false,
                     duty: 'Airport Pickup & Local Sightseeing',
                     description: 'Airport Pickup & Local Sightseeing',
-                    vehicleType: 'Innova Crysta',
-                    vehicleCount: 1,
-                    quantity: 1,
-                    rate: 0,
-                    amount: 0
-                },
-                {
-                    dayNo: 2,
-                    date: today,
-                    time: 'APG',
-                    isApg: true,
-                    duty: 'City Tour / Transfer',
-                    description: 'City Tour / Transfer',
-                    vehicleType: 'Innova Crysta',
-                    vehicleCount: 1,
-                    quantity: 1,
-                    rate: 0,
-                    amount: 0
-                },
-                {
-                    dayNo: 3,
-                    date: today,
-                    time: '11:30 AM',
-                    isApg: false,
-                    duty: 'City Tour / Transfer',
-                    description: 'City Tour / Transfer',
-                    vehicleType: 'Innova Crysta',
-                    vehicleCount: 1,
-                    quantity: 1,
-                    rate: 0,
-                    amount: 0
-                },
-                {
-                    dayNo: 4,
-                    date: today,
-                    time: 'APG',
-                    isApg: true,
-                    duty: 'City Tour / Transfer',
-                    description: 'City Tour / Transfer',
-                    vehicleType: 'Innova Crysta',
-                    vehicleCount: 1,
-                    quantity: 1,
-                    rate: 0,
-                    amount: 0
-                },
-                {
-                    dayNo: 5,
-                    date: today,
-                    time: '02:15 PM',
-                    isApg: false,
-                    duty: 'City Tour / Transfer',
-                    description: 'City Tour / Transfer',
                     vehicleType: 'Innova Crysta',
                     vehicleCount: 1,
                     quantity: 1,
@@ -1398,8 +1365,8 @@ export default function Leads() {
                                     {/* 7. Actions */}
                                     <td style={{ padding: '16px 20px', textAlign: 'right' }}>
                                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                                            {/* Book action if not confirmed */}
-                                            {lead.status !== 'Confirmed' && (
+                                            {/* Record Advance / Confirm action */}
+                                            {lead.status !== 'Confirmed' ? (
                                                 <button
                                                     onClick={() => {
                                                         setConvertingLead(lead);
@@ -1408,23 +1375,43 @@ export default function Leads() {
                                                         setAdminOverride(false);
                                                         setShowConvertModal(true);
                                                     }}
-                                                    title="Convert to Confirmed Booking"
+                                                    title="Record Advance & Confirm Booking"
                                                     style={{
                                                         background: 'rgba(34, 197, 94, 0.2)',
                                                         color: '#4ade80',
-                                                        border: '1px solid rgba(34, 197, 94, 0.3)',
-                                                        padding: '6px 10px',
+                                                        border: '1px solid rgba(34, 197, 94, 0.4)',
+                                                        padding: '6px 12px',
                                                         borderRadius: '8px',
                                                         cursor: 'pointer',
-                                                        display: 'flex',
+                                                        display: 'inline-flex',
                                                         alignItems: 'center',
-                                                        gap: '4px',
-                                                        fontWeight: '700',
-                                                        fontSize: '11px'
+                                                        gap: '5px',
+                                                        fontWeight: '800',
+                                                        fontSize: '11.5px',
+                                                        transition: 'all 0.2s',
+                                                        whiteSpace: 'nowrap'
                                                     }}
                                                 >
-                                                    <CheckCircle size={13} /> Book
+                                                    <CreditCard size={13} /> Record Advance
                                                 </button>
+                                            ) : (
+                                                <span
+                                                    style={{
+                                                        padding: '5px 10px',
+                                                        borderRadius: '8px',
+                                                        fontSize: '11px',
+                                                        fontWeight: '800',
+                                                        background: 'rgba(34, 197, 94, 0.1)',
+                                                        color: '#4ade80',
+                                                        border: '1px solid rgba(34, 197, 94, 0.25)',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px'
+                                                    }}
+                                                    title="Booking Confirmed"
+                                                >
+                                                    <CheckCircle size={12} /> Confirmed
+                                                </span>
                                             )}
 
                                             {/* Quotation PDF */}

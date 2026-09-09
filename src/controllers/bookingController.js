@@ -170,10 +170,110 @@ const cancelBooking = asyncHandler(async (req, res) => {
     res.json({ message: 'Booking and linked duties cancelled successfully', booking });
 });
 
+// @desc    Assign driver and vehicle to booking itinerary days and shoot into DRS
+// @route   POST /api/bookings/:id/assign-drivers
+// @access  Private/AdminOrExecutive
+const assignBookingDrivers = asyncHandler(async (req, res) => {
+    const { itinerary } = req.body;
+
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+        res.status(404);
+        throw new Error('Booking not found');
+    }
+
+    if (Array.isArray(itinerary)) {
+        booking.itinerary = itinerary;
+        await booking.save();
+
+        // Sync each day into DRSDuty
+        for (const day of itinerary) {
+            const dayNo = day.dayNo || 1;
+            const dateStr = day.date ? new Date(day.date).toISOString().split('T')[0] : null;
+
+            let dutyQuery = {
+                $or: [
+                    { bookingRef: booking._id, dayNo: dayNo },
+                    { bookingId: booking.bookingId, dayNo: dayNo }
+                ]
+            };
+
+            let existingDuty = await DRSDuty.findOne(dutyQuery);
+
+            if (!existingDuty && dateStr) {
+                existingDuty = await DRSDuty.findOne({
+                    bookingRef: booking._id,
+                    date: {
+                        $gte: new Date(`${dateStr}T00:00:00.000Z`),
+                        $lte: new Date(`${dateStr}T23:59:59.999Z`)
+                    }
+                });
+            }
+
+            const driverId = day.driverId || day.driver || null;
+            const driverName = day.driverName || day.customDriverName || '';
+            const driverPhone = day.driverPhone || day.driverMobile || '';
+            const vehicleId = day.vehicleId || day.vehicle || null;
+            const vehicleNumber = day.vehicleNumber || day.customCarNumber || '';
+            const isAssigned = !!(driverId || driverName);
+
+            if (existingDuty) {
+                existingDuty.driver = driverId;
+                existingDuty.customDriverName = driverName;
+                existingDuty.driverMobile = driverPhone;
+                existingDuty.vehicle = vehicleId;
+                existingDuty.customCarNumber = vehicleNumber;
+                existingDuty.status = isAssigned ? 'Assigned' : 'Scheduled';
+                if (day.time) existingDuty.time = day.time;
+                if (day.duty || day.description) {
+                    existingDuty.duty = day.duty || day.description;
+                    existingDuty.itinerary = day.duty || day.description;
+                }
+                await existingDuty.save();
+            } else {
+                const dutyText = day.duty || day.description || 'Scheduled Duty';
+                const newDuty = await DRSDuty.create({
+                    company: booking.company,
+                    bookingRef: booking._id,
+                    bookingId: booking.bookingId,
+                    clientName: booking.clientName,
+                    mobileNumber: booking.mobileNumber,
+                    date: day.date || booking.travelStartDate || new Date(),
+                    time: day.time || '09:00 AM',
+                    pickupPoint: day.pickupPoint || '',
+                    duty: dutyText,
+                    itinerary: dutyText,
+                    dayNo: dayNo,
+                    carType: day.vehicleType || booking.vehicleType || 'Innova Crysta',
+                    driver: driverId,
+                    customDriverName: driverName,
+                    driverMobile: driverPhone,
+                    vehicle: vehicleId,
+                    customCarNumber: vehicleNumber,
+                    revenue: day.amount || 0,
+                    paymentStatus: booking.paymentStatus === 'Full Received' ? 'Full Received' : 'Advance Received',
+                    status: isAssigned ? 'Assigned' : 'Scheduled',
+                    isDirectBooking: false
+                });
+
+                if (!booking.drsDuties) booking.drsDuties = [];
+                booking.drsDuties.push(newDuty._id);
+                await booking.save();
+            }
+        }
+    }
+
+    res.json({
+        message: 'Driver assignments saved and synced to DRS successfully',
+        booking
+    });
+});
+
 module.exports = {
     getBookings,
     getBookingById,
     updateBooking,
     recordBookingPayment,
-    cancelBooking
+    cancelBooking,
+    assignBookingDrivers
 };

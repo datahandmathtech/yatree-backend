@@ -5,7 +5,8 @@ const {
     getBookingById,
     updateBooking,
     recordBookingPayment,
-    cancelBooking
+    cancelBooking,
+    assignBookingDrivers
 } = require('../controllers/bookingController');
 const { adminOrExecutive, checkCompany, protect } = require('../middleware/authMiddleware');
 
@@ -20,5 +21,6 @@ router.route('/single/:id')
 
 router.post('/:id/payment', adminOrExecutive, recordBookingPayment);
 router.post('/:id/cancel', adminOrExecutive, cancelBooking);
+router.post('/:id/assign-drivers', adminOrExecutive, assignBookingDrivers);
 
 module.exports = router;

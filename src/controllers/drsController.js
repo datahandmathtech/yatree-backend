@@ -1,4 +1,5 @@
 const DRSDuty = require('../models/DRSDuty');
+const Booking = require('../models/Booking');
 const asyncHandler = require('express-async-handler');
 
 // @desc    Get DRS duties for a company by date, view, or date range
@@ -122,6 +123,42 @@ const updateDRSDuty = asyncHandler(async (req, res) => {
     .populate('vehicle', 'carNumber model type brand')
     .populate('leadId', 'clientName leadId status')
     .populate('bookingRef', 'bookingId clientName totalAmount advancePaid balanceDue');
+
+    // Sync back to Booking itinerary ("both ways")
+    if (updatedDuty.bookingRef || updatedDuty.bookingId) {
+        try {
+            const bkg = await Booking.findOne({
+                $or: [
+                    { _id: updatedDuty.bookingRef },
+                    { bookingId: updatedDuty.bookingId }
+                ]
+            });
+            if (bkg && Array.isArray(bkg.itinerary)) {
+                let modified = false;
+                const dutyDate = updatedDuty.date ? new Date(updatedDuty.date).toISOString().split('T')[0] : '';
+                bkg.itinerary = bkg.itinerary.map(item => {
+                    const itemDate = item.date ? new Date(item.date).toISOString().split('T')[0] : '';
+                    if (item.dayNo === updatedDuty.dayNo || (dutyDate && itemDate === dutyDate)) {
+                        modified = true;
+                        return {
+                            ...item,
+                            driverId: updatedDuty.driver?._id || updatedDuty.driver || null,
+                            driverName: updatedDuty.driver?.name || updatedDuty.customDriverName || '',
+                            driverPhone: updatedDuty.driver?.mobile || updatedDuty.driverMobile || '',
+                            vehicleId: updatedDuty.vehicle?._id || updatedDuty.vehicle || null,
+                            vehicleNumber: updatedDuty.vehicle?.carNumber || updatedDuty.customCarNumber || ''
+                        };
+                    }
+                    return item;
+                });
+                if (modified) {
+                    await bkg.save();
+                }
+            }
+        } catch (syncErr) {
+            console.error('Error syncing DRS update back to Booking itinerary:', syncErr);
+        }
+    }
 
     res.json(updatedDuty);
 });

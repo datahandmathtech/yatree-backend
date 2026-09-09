@@ -14,8 +14,16 @@ const bookingItinerarySchema = new mongoose.Schema({
     amount: { type: Number, default: 0 },
     inclusions: { type: String, default: '' },
     exclusions: { type: String, default: '' },
-    specialNotes: { type: String, default: '' }
-});
+    specialNotes: { type: String, default: '' },
+    // Driver & Vehicle assignment
+    driver: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    driverId: { type: String, default: '' },
+    driverName: { type: String, default: '' },
+    driverPhone: { type: String, default: '' },
+    vehicle: { type: mongoose.Schema.Types.ObjectId, ref: 'Vehicle', default: null },
+    vehicleId: { type: String, default: '' },
+    vehicleNumber: { type: String, default: '' }
+}, { strict: false });
 
 const bookingSchema = new mongoose.Schema({
     bookingId: {

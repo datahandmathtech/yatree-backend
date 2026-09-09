@@ -15,7 +15,15 @@ import { generateBookingConfirmationPDF } from '../utils/bookingConfirmationPdf'
 import { generateTaxInvoicePDF } from '../utils/taxInvoicePdf';
 
 const MONTH_TABS = [
-    'All Months', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug'
+    'All Months', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'
+];
+
+const BASELINE_DRIVERS = [
+    { _id: 'drv-1', name: 'Ramesh Kumar', mobile: '+91 98765 11223', vehicleNumber: 'RJ14 PA 1234', vehicleModel: 'Innova Crysta' },
+    { _id: 'drv-2', name: 'Suresh Gurjar', mobile: '+91 98234 22334', vehicleNumber: 'RJ14 TA 5678', vehicleModel: 'Innova' },
+    { _id: 'drv-3', name: 'Mukesh Sharma', mobile: '+91 98111 33445', vehicleNumber: 'RJ14 PA 9012', vehicleModel: 'Ertiga' },
+    { _id: 'drv-4', name: 'Mahesh Verma', mobile: '+91 97654 44556', vehicleNumber: 'RJ14 CA 3456', vehicleModel: 'Swift Dzire' },
+    { _id: 'drv-5', name: 'Dinesh Yadav', mobile: '+91 98333 55667', vehicleNumber: 'RJ14 PA 7890', vehicleModel: 'Tempo Traveller' }
 ];
 
 // Baseline Mockup Data matching media_1788927832202.png (8 bookings, Total: ₹4,92,000 / Rec: ₹2,91,500 / Bal: ₹2,00,500)
@@ -186,7 +194,7 @@ export default function Bookings() {
 
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [selectedMonth, setSelectedMonth] = useState('Sep');
+    const [selectedMonth, setSelectedMonth] = useState('All Months');
     const [searchTerm, setSearchTerm] = useState('');
 
     // Sorting state
@@ -226,13 +234,147 @@ export default function Bookings() {
     // Cancel Form
     const [cancelReason, setCancelReason] = useState('');
 
+    // Assign Driver Modal State
+    const [showAssignDriverModal, setShowAssignDriverModal] = useState(false);
+    const [assigningBooking, setAssigningBooking] = useState(null);
+    const [assignItinerary, setAssignItinerary] = useState([]);
+    const [driversList, setDriversList] = useState([]);
+    const [vehiclesList, setVehiclesList] = useState([]);
+    const [savingAssignment, setSavingAssignment] = useState(false);
+
     useEffect(() => {
         if (selectedCompany?._id) {
             fetchBookings();
+            fetchDriversAndVehicles();
         } else {
             setBookings(BASELINE_SEPTEMBER_BOOKINGS);
         }
     }, [selectedCompany]);
+
+    const fetchDriversAndVehicles = async () => {
+        if (!selectedCompany?._id) return;
+        try {
+            const [dRes, vRes] = await Promise.all([
+                axios.get(`/api/admin/drivers/${selectedCompany._id}?usePagination=false&status=active`).catch(() => ({ data: [] })),
+                axios.get(`/api/admin/vehicles/${selectedCompany._id}?usePagination=false`).catch(() => ({ data: [] }))
+            ]);
+            setDriversList(dRes.data?.drivers || dRes.data || []);
+            setVehiclesList(vRes.data?.vehicles || vRes.data || []);
+        } catch (err) {
+            console.error('Error fetching drivers/vehicles:', err);
+        }
+    };
+
+    const handleOpenAssignDriver = (bkg) => {
+        setAssigningBooking(bkg);
+        let days = [];
+        if (Array.isArray(bkg.itinerary) && bkg.itinerary.length > 0) {
+            days = bkg.itinerary.map((d, i) => ({
+                dayNo: d.dayNo || (i + 1),
+                date: d.date || bkg.travelStartDate,
+                time: d.time || '09:00 AM',
+                duty: d.duty || d.description || 'City Tour / Transfer',
+                vehicleType: d.vehicleType || bkg.vehicleType || 'Innova Crysta',
+                driverId: d.driverId || d.driver?._id || d.driver || '',
+                driverName: d.driverName || d.driver?.name || d.customDriverName || '',
+                driverPhone: d.driverPhone || d.driver?.mobile || d.driverMobile || '',
+                vehicleId: d.vehicleId || d.vehicle?._id || d.vehicle || '',
+                vehicleNumber: d.vehicleNumber || d.vehicle?.carNumber || d.customCarNumber || ''
+            }));
+        } else {
+            const s = bkg.travelStartDate ? new Date(bkg.travelStartDate) : new Date();
+            const e = bkg.travelEndDate ? new Date(bkg.travelEndDate) : s;
+            const daysCount = Math.max(1, Math.round((e - s) / 86400000) + 1);
+            for (let i = 0; i < daysCount; i++) {
+                const curDate = new Date(s);
+                curDate.setDate(curDate.getDate() + i);
+                days.push({
+                    dayNo: i + 1,
+                    date: curDate.toISOString().split('T')[0],
+                    time: '09:00 AM',
+                    duty: i === 0 ? 'Airport Pickup & Local Sightseeing' : 'City Tour / Transfer',
+                    vehicleType: bkg.vehicleType || 'Innova Crysta',
+                    driverId: '',
+                    driverName: '',
+                    driverPhone: '',
+                    vehicleId: '',
+                    vehicleNumber: ''
+                });
+            }
+        }
+        setAssignItinerary(days);
+        setShowAssignDriverModal(true);
+    };
+
+    const handleSaveDriverAssignments = async (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        try {
+            setSavingAssignment(true);
+            if (assigningBooking._id && !String(assigningBooking._id).startsWith('bkg-mock')) {
+                await axios.post(`/api/bookings/${assigningBooking._id}/assign-drivers`, {
+                    itinerary: assignItinerary
+                });
+                fetchBookings();
+            } else {
+                setBookings(prev => prev.map(b => {
+                    if (b._id === assigningBooking._id || b.bookingCode === assigningBooking.bookingCode) {
+                        return { ...b, itinerary: assignItinerary };
+                    }
+                    return b;
+                }));
+            }
+            alert('Driver assigned successfully! DRS Schedule has been updated.');
+            setShowAssignDriverModal(false);
+        } catch (err) {
+            console.error('Error saving driver assignments:', err);
+            alert(err.response?.data?.message || 'Failed to save driver assignments');
+        } finally {
+            setSavingAssignment(false);
+        }
+    };
+
+    const handleUpdateDayDriver = (index, driverVal) => {
+        const updated = [...assignItinerary];
+        const allDrivers = (driversList && driversList.length > 0) ? driversList : BASELINE_DRIVERS;
+        if (!driverVal) {
+            updated[index] = {
+                ...updated[index],
+                driverId: '',
+                driverName: '',
+                driverPhone: ''
+            };
+        } else if (driverVal === '__custom__') {
+            updated[index] = {
+                ...updated[index],
+                driverId: 'custom',
+                driverName: updated[index].driverName || '',
+                driverPhone: updated[index].driverPhone || ''
+            };
+        } else {
+            const found = allDrivers.find(d => String(d._id) === String(driverVal));
+            if (found) {
+                updated[index] = {
+                    ...updated[index],
+                    driverId: found._id,
+                    driverName: found.name,
+                    driverPhone: found.mobile || found.phone || '',
+                    vehicleId: found.vehicleId || found.vehicle?._id || updated[index].vehicleId || '',
+                    vehicleNumber: found.vehicleNumber || found.vehicle?.carNumber || updated[index].vehicleNumber || ''
+                };
+            }
+        }
+        setAssignItinerary(updated);
+    };
+
+    const handleUpdateDayField = (index, field, value) => {
+        const updated = [...assignItinerary];
+        updated[index] = {
+            ...updated[index],
+            [field]: value
+        };
+        setAssignItinerary(updated);
+    };
+
 
     const fetchBookings = async () => {
         try {
@@ -261,14 +403,25 @@ export default function Bookings() {
 
         // 1. Month Filter
         if (selectedMonth !== 'All Months') {
+            const monthCodeMap = {
+                'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+                'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
+                'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+            };
+            const targetCodePrefix = monthCodeMap[selectedMonth];
+
             list = list.filter(b => {
-                if (b.month) return b.month === selectedMonth;
+                if (b.month && b.month === selectedMonth) return true;
+                const code = b.bookingCode || b.clientCode || b.bookingId || '';
+                if (targetCodePrefix && /^\d{2}\//.test(code)) {
+                    if (code.startsWith(targetCodePrefix + '/')) return true;
+                }
                 const d = new Date(b.travelStartDate || b.createdAt || 0);
                 if (!isNaN(d.getTime())) {
                     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                     return months[d.getMonth()] === selectedMonth;
                 }
-                return true;
+                return false;
             });
         }
 
@@ -971,7 +1124,7 @@ export default function Bookings() {
                                             </span>
                                         </td>
 
-                                        {/* 10. Actions (PDF, Pay, Edit, ⋮) */}
+                                        {/* 10. Actions (PDF, Pay, Assign Driver, ⋮) matching media_1788929159044.png */}
                                         <td style={{ padding: '14px 16px', textAlign: 'center' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                                                 {/* PDF Button */}
@@ -979,21 +1132,22 @@ export default function Bookings() {
                                                     onClick={() => generateBookingConfirmationPDF(bkg, selectedCompany)}
                                                     title="Download Confirmation PDF"
                                                     style={{
-                                                        padding: '5px 9px',
-                                                        background: 'rgba(255,255,255,0.06)',
-                                                        border: '1px solid rgba(255,255,255,0.15)',
-                                                        borderRadius: '6px',
-                                                        color: 'white',
-                                                        fontSize: '11px',
+                                                        padding: '6px 14px',
+                                                        background: 'rgba(255, 255, 255, 0.08)',
+                                                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                                                        borderRadius: '20px',
+                                                        color: '#ffffff',
+                                                        fontSize: '11.5px',
                                                         fontWeight: '700',
                                                         cursor: 'pointer',
-                                                        display: 'flex',
+                                                        display: 'inline-flex',
                                                         alignItems: 'center',
-                                                        gap: '4px',
-                                                        transition: 'all 0.2s'
+                                                        gap: '5px',
+                                                        transition: 'all 0.2s',
+                                                        whiteSpace: 'nowrap'
                                                     }}
                                                 >
-                                                    <FileText size={12} /> PDF
+                                                    <FileText size={13} /> PDF
                                                 </button>
 
                                                 {/* Pay Button */}
@@ -1001,42 +1155,45 @@ export default function Bookings() {
                                                     onClick={() => handleOpenPaymentModal(bkg)}
                                                     title="Record Payment"
                                                     style={{
-                                                        padding: '5px 9px',
-                                                        background: 'rgba(34, 197, 94, 0.15)',
-                                                        border: '1px solid rgba(34, 197, 94, 0.35)',
-                                                        borderRadius: '6px',
-                                                        color: '#4ade80',
-                                                        fontSize: '11px',
+                                                        padding: '6px 14px',
+                                                        background: 'rgba(6, 95, 70, 0.7)',
+                                                        border: '1px solid rgba(52, 211, 153, 0.3)',
+                                                        borderRadius: '20px',
+                                                        color: '#34d399',
+                                                        fontSize: '11.5px',
                                                         fontWeight: '700',
                                                         cursor: 'pointer',
-                                                        display: 'flex',
+                                                        display: 'inline-flex',
                                                         alignItems: 'center',
-                                                        gap: '4px',
-                                                        transition: 'all 0.2s'
+                                                        gap: '5px',
+                                                        transition: 'all 0.2s',
+                                                        whiteSpace: 'nowrap'
                                                     }}
                                                 >
-                                                    <CreditCard size={12} /> Pay
+                                                    <CreditCard size={13} /> Pay
                                                 </button>
 
-                                                {/* Edit Button */}
+                                                {/* Assign Driver Button */}
                                                 <button
-                                                    onClick={() => handleOpenDetailModal(bkg)}
-                                                    title="Edit Booking"
+                                                    onClick={() => handleOpenAssignDriver(bkg)}
+                                                    title="Assign Driver & Vehicle"
                                                     style={{
-                                                        padding: '5px 9px',
-                                                        background: 'rgba(37, 99, 235, 0.25)',
-                                                        border: '1px solid rgba(59, 130, 246, 0.35)',
-                                                        color: '#60a5fa',
-                                                        fontSize: '11px',
+                                                        padding: '6px 14px',
+                                                        background: 'rgba(29, 78, 216, 0.85)',
+                                                        border: '1px solid rgba(96, 165, 250, 0.4)',
+                                                        borderRadius: '20px',
+                                                        color: '#ffffff',
+                                                        fontSize: '11.5px',
                                                         fontWeight: '700',
                                                         cursor: 'pointer',
-                                                        display: 'flex',
+                                                        display: 'inline-flex',
                                                         alignItems: 'center',
-                                                        gap: '4px',
-                                                        transition: 'all 0.2s'
+                                                        gap: '5px',
+                                                        transition: 'all 0.2s',
+                                                        whiteSpace: 'nowrap'
                                                     }}
                                                 >
-                                                    <Edit size={12} /> Edit
+                                                    <Car size={13} /> Assign Driver
                                                 </button>
 
                                                 {/* More Options Dropdown */}
@@ -1074,6 +1231,30 @@ export default function Bookings() {
                                                             minWidth: '170px',
                                                             textAlign: 'left'
                                                         }}>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setActiveActionMenu(null);
+                                                                    handleOpenDetailModal(bkg);
+                                                                }}
+                                                                style={{
+                                                                    width: '100%',
+                                                                    padding: '7px 10px',
+                                                                    background: 'transparent',
+                                                                    border: 'none',
+                                                                    color: '#60a5fa',
+                                                                    fontSize: '12px',
+                                                                    fontWeight: '600',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '8px',
+                                                                    cursor: 'pointer',
+                                                                    borderRadius: '6px'
+                                                                }}
+                                                            >
+                                                                <Edit size={13} /> Edit Booking
+                                                            </button>
+
+
                                                             <button
                                                                 onClick={() => {
                                                                     setActiveActionMenu(null);
@@ -1345,6 +1526,269 @@ export default function Bookings() {
                                     </button>
                                 </div>
                             </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* ASSIGN DRIVER MODAL */}
+            <AnimatePresence>
+                {showAssignDriverModal && assigningBooking && (
+                    <div style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(0,0,0,0.82)',
+                        backdropFilter: 'blur(8px)',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        zIndex: 99999,
+                        padding: '20px'
+                    }}>
+                        <motion.div
+                            initial={{ y: 20, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            exit={{ y: 20, opacity: 0 }}
+                            style={{
+                                width: '100%',
+                                maxWidth: '850px',
+                                maxHeight: '90vh',
+                                overflowY: 'auto',
+                                background: '#0b1120',
+                                border: '1px solid rgba(56, 189, 248, 0.3)',
+                                borderRadius: '16px',
+                                padding: '26px',
+                                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)'
+                            }}
+                        >
+                            {/* Header */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '14px' }}>
+                                <div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <div style={{
+                                            width: '36px',
+                                            height: '36px',
+                                            borderRadius: '10px',
+                                            background: 'rgba(56, 189, 248, 0.15)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: '#38bdf8'
+                                        }}>
+                                            <Car size={20} />
+                                        </div>
+                                        <div>
+                                            <h2 style={{ color: 'white', margin: 0, fontSize: '18px', fontWeight: '800' }}>
+                                                Assign Drivers & Vehicles
+                                            </h2>
+                                            <p style={{ margin: '2px 0 0 0', color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>
+                                                Booking: <strong style={{ color: '#38bdf8' }}>{assigningBooking.bookingCode || assigningBooking.bookingId}</strong> • Client: <strong style={{ color: 'white' }}>{assigningBooking.clientName}</strong> • {assigningBooking.vehicleType || 'Car'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setShowAssignDriverModal(false)}
+                                    style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', padding: '4px' }}
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
+
+                            {/* Info Alert */}
+                            <div style={{
+                                background: 'rgba(2, 132, 199, 0.12)',
+                                border: '1px solid rgba(56, 189, 248, 0.3)',
+                                borderRadius: '10px',
+                                padding: '10px 14px',
+                                marginBottom: '18px',
+                                fontSize: '12px',
+                                color: '#7dd3fc',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                            }}>
+                                <span>⚡</span>
+                                <span>
+                                    <strong>Bidirectional DRS Sync:</strong> Assign a driver for each day of the itinerary below. If not confirmed yet, leave it as <em>"Assign Later"</em>. Drivers assigned here instantly shoot into DRS, and assignments changed in DRS automatically update here.
+                                </span>
+                            </div>
+
+                            {/* Day-Wise Itinerary List */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+                                {assignItinerary.map((day, idx) => {
+                                    const allDrivers = (driversList && driversList.length > 0) ? driversList : BASELINE_DRIVERS;
+                                    const isCustomDriver = day.driverId === 'custom' || (!allDrivers.some(d => String(d._id) === String(day.driverId)) && day.driverName && !day.driverId);
+
+                                    return (
+                                        <div
+                                            key={idx}
+                                            style={{
+                                                background: 'rgba(255,255,255,0.03)',
+                                                border: '1px solid rgba(255,255,255,0.08)',
+                                                borderRadius: '12px',
+                                                padding: '14px 16px',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '10px'
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <span style={{
+                                                        background: '#1e3a8a',
+                                                        color: '#93c5fd',
+                                                        padding: '3px 10px',
+                                                        borderRadius: '6px',
+                                                        fontSize: '11px',
+                                                        fontWeight: '800'
+                                                    }}>
+                                                        Day {day.dayNo || idx + 1}
+                                                    </span>
+                                                    <span style={{ color: 'white', fontWeight: '700', fontSize: '13px' }}>
+                                                        {day.date ? new Date(day.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Date Pending'}
+                                                    </span>
+                                                    <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>•</span>
+                                                    <span style={{ color: '#fbbf24', fontSize: '12px', fontWeight: '600' }}>
+                                                        {day.time || '09:00 AM'}
+                                                    </span>
+                                                </div>
+                                                <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12.5px', fontWeight: '500' }}>
+                                                    {day.duty || day.description || 'City Tour / Transfer'}
+                                                </div>
+                                            </div>
+
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginTop: '4px' }}>
+                                                {/* Driver Selector */}
+                                                <div>
+                                                    <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: '600', marginBottom: '4px' }}>
+                                                        Driver Assignment
+                                                    </label>
+                                                    <select
+                                                        value={isCustomDriver ? '__custom__' : (day.driverId || '')}
+                                                        onChange={(e) => handleUpdateDayDriver(idx, e.target.value)}
+                                                        className="premium-compact-input"
+                                                        style={{
+                                                            width: '100%',
+                                                            height: '38px',
+                                                            background: '#070d18',
+                                                            color: day.driverName ? '#34d399' : 'rgba(255,255,255,0.7)',
+                                                            border: day.driverName ? '1px solid rgba(52, 211, 153, 0.4)' : '1px solid rgba(255,255,255,0.15)',
+                                                            borderRadius: '8px',
+                                                            fontSize: '12px'
+                                                        }}
+                                                    >
+                                                        <option value="">-- Not Confirmed (Assign Later) --</option>
+                                                        <optgroup label="Company Drivers">
+                                                            {allDrivers.map(drv => (
+                                                                <option key={drv._id} value={drv._id}>
+                                                                    {drv.name} ({drv.mobile || drv.phone}) {drv.vehicleNumber ? `[${drv.vehicleNumber}]` : ''}
+                                                                </option>
+                                                            ))}
+                                                        </optgroup>
+                                                        <option value="__custom__">-- Other / Outsourced Driver --</option>
+                                                    </select>
+                                                </div>
+
+                                                {/* Vehicle Assignment */}
+                                                <div>
+                                                    <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: '600', marginBottom: '4px' }}>
+                                                        Assigned Vehicle / Cab
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="e.g. RJ14 PA 1234 (or Crysta)"
+                                                        value={day.vehicleNumber || ''}
+                                                        onChange={(e) => handleUpdateDayField(idx, 'vehicleNumber', e.target.value)}
+                                                        style={{
+                                                            ...inputStyle,
+                                                            height: '38px',
+                                                            fontSize: '12px'
+                                                        }}
+                                                    />
+                                                </div>
+
+                                                {/* Custom Driver inputs if custom selected */}
+                                                {isCustomDriver && (
+                                                    <>
+                                                        <div>
+                                                            <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: '600', marginBottom: '4px' }}>
+                                                                Driver Name
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Driver Name"
+                                                                value={day.driverName || ''}
+                                                                onChange={(e) => handleUpdateDayField(idx, 'driverName', e.target.value)}
+                                                                style={{ ...inputStyle, height: '38px', fontSize: '12px' }}
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: '600', marginBottom: '4px' }}>
+                                                                Driver Mobile
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="+91 Mobile"
+                                                                value={day.driverPhone || ''}
+                                                                onChange={(e) => handleUpdateDayField(idx, 'driverPhone', e.target.value)}
+                                                                style={{ ...inputStyle, height: '38px', fontSize: '12px' }}
+                                                            />
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Modal Footer */}
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAssignDriverModal(false)}
+                                    style={{
+                                        padding: '10px 18px',
+                                        background: 'rgba(255,255,255,0.06)',
+                                        color: 'white',
+                                        border: '1px solid rgba(255,255,255,0.15)',
+                                        borderRadius: '8px',
+                                        cursor: 'pointer',
+                                        fontWeight: '600',
+                                        fontSize: '13px'
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleSaveDriverAssignments}
+                                    disabled={savingAssignment}
+                                    style={{
+                                        padding: '10px 22px',
+                                        background: '#2563eb',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        cursor: 'pointer',
+                                        fontWeight: '800',
+                                        fontSize: '13px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        boxShadow: '0 4px 12px rgba(37, 99, 235, 0.4)'
+                                    }}
+                                >
+                                    {savingAssignment ? (
+                                        <>Updating DRS...</>
+                                    ) : (
+                                        <>
+                                            <CheckCircle size={15} /> Confirm & Update DRS
+                                        </>
+                                    )}
+                                </button>
+                            </div>
                         </motion.div>
                     </div>
                 )}
