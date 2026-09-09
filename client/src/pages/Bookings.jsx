@@ -6,7 +6,8 @@ import {
     Calendar, Car, IndianRupee, Download, CheckCircle, Clock,
     AlertCircle, Search, Filter, Phone, MessageSquare, Plus,
     FileText, X, ArrowUpRight, ShieldCheck, UserCheck,
-    CreditCard, Hourglass, Edit, MoreVertical, User, ArrowUpDown
+    CreditCard, Hourglass, Edit, MoreVertical, User, ArrowUpDown,
+    ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import SEO from '../components/SEO';
