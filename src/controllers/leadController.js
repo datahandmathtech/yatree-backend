@@ -216,9 +216,15 @@ const deleteLead = asyncHandler(async (req, res) => {
         throw new Error('Lead not found');
     }
 
-    if (lead.status === 'Confirmed') {
-        res.status(400);
-        throw new Error('Cannot delete a confirmed lead. Please cancel the booking instead.');
+    // If confirmed or has linked booking/duties, cascade clean them up
+    try {
+        if (lead.bookingRef || lead.status === 'Confirmed') {
+            await Booking.deleteMany({ $or: [{ lead: lead._id }, { _id: lead.bookingRef }] });
+            await DRSDuty.deleteMany({ leadId: lead._id });
+            await LedgerEntry.deleteMany({ referenceId: lead._id });
+        }
+    } catch (cleanupErr) {
+        console.error('Error cleaning up associated lead records:', cleanupErr);
     }
 
     await lead.deleteOne();

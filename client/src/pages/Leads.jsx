@@ -299,14 +299,20 @@ export default function Leads() {
                 row.time = '09:00 AM';
             }
         } else if (field === 'rate' || field === 'quantity') {
-            const qty = Number(field === 'quantity' ? value : (row.quantity || row.vehicleCount || 1));
-            const rate = Number(field === 'rate' ? value : (row.rate || 0));
+            const qty = field === 'quantity'
+                ? (value === '' ? '' : Math.max(1, parseInt(value) || 1))
+                : (row.quantity === '' ? 1 : (Number(row.quantity || row.vehicleCount) || 1));
+            const rate = field === 'rate'
+                ? (value === '' ? '' : Math.max(0, parseFloat(value) || 0))
+                : (row.rate === '' ? 0 : (Number(row.rate) || 0));
             row.rate = rate;
             row.quantity = qty;
-            row.vehicleCount = qty;
-            row.amount = qty * rate;
+            row.vehicleCount = qty === '' ? 1 : qty;
+            const numericQty = qty === '' ? 1 : Number(qty);
+            const numericRate = rate === '' ? 0 : Number(rate);
+            row.amount = numericQty * numericRate;
         } else if (field === 'amount') {
-            row.amount = Number(value) || 0;
+            row.amount = value === '' ? '' : (Number(value) || 0);
         } else if (field === 'duty') {
             row.duty = value;
             row.description = value;
@@ -504,13 +510,13 @@ export default function Leads() {
     };
 
     const handleDelete = async (id) => {
-        if (window.confirm('Are you sure you want to delete this lead?')) {
+        if (window.confirm('Are you sure you want to delete this lead? Any associated bookings and schedules will also be removed.')) {
             try {
                 await axios.delete(`/api/leads/single/${id}`);
                 fetchLeads();
             } catch (error) {
                 console.error('Error deleting lead:', error);
-                alert('Failed to delete lead');
+                alert(error.response?.data?.message || 'Failed to delete lead');
             }
         }
     };
@@ -2026,7 +2032,27 @@ export default function Leads() {
                                                 type="number"
                                                 min="1"
                                                 value={formData.numberOfCars}
-                                                onChange={e => setFormData({ ...formData, numberOfCars: Number(e.target.value) || 1 })}
+                                                onChange={e => {
+                                                    const cars = Math.max(1, parseInt(e.target.value) || 1);
+                                                    setFormData(prev => {
+                                                        const updatedItin = (prev.itinerary || []).map(day => {
+                                                            const rate = Number(day.rate) || 0;
+                                                            return {
+                                                                ...day,
+                                                                vehicleCount: cars,
+                                                                quantity: cars,
+                                                                amount: cars * rate
+                                                            };
+                                                        });
+                                                        const total = updatedItin.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+                                                        return {
+                                                            ...prev,
+                                                            numberOfCars: cars,
+                                                            itinerary: updatedItin,
+                                                            totalAmount: total
+                                                        };
+                                                    });
+                                                }}
                                                 style={darkInputStyle}
                                             />
                                         </div>
@@ -2073,9 +2099,9 @@ export default function Leads() {
                                                     <th style={{ padding: '12px 10px', fontSize: '11px', fontWeight: '700', color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>APG ⓘ</th>
                                                     <th style={{ padding: '12px 10px', fontSize: '11px', fontWeight: '700', color: 'rgba(255,255,255,0.6)' }}>ROUTE / ITINERARY</th>
                                                     <th style={{ padding: '12px 10px', fontSize: '11px', fontWeight: '700', color: 'rgba(255,255,255,0.6)' }}>VEHICLE</th>
-                                                    <th style={{ padding: '12px 10px', fontSize: '11px', fontWeight: '700', color: 'rgba(255,255,255,0.6)' }}>QTY</th>
-                                                    <th style={{ padding: '12px 10px', fontSize: '11px', fontWeight: '700', color: 'rgba(255,255,255,0.6)' }}>RATE (₹)</th>
-                                                    <th style={{ padding: '12px 10px', fontSize: '11px', fontWeight: '700', color: 'rgba(255,255,255,0.6)' }}>AMOUNT (₹)</th>
+                                                    <th style={{ padding: '12px 10px', fontSize: '11px', fontWeight: '700', color: 'rgba(255,255,255,0.6)', textAlign: 'center', width: '80px' }}>QTY</th>
+                                                    <th style={{ padding: '12px 10px', fontSize: '11px', fontWeight: '700', color: 'rgba(255,255,255,0.6)', textAlign: 'right', width: '100px' }}>RATE (₹)</th>
+                                                    <th style={{ padding: '12px 10px', fontSize: '11px', fontWeight: '700', color: 'rgba(255,255,255,0.6)', textAlign: 'right', width: '110px' }}>AMOUNT (₹)</th>
                                                     <th style={{ padding: '12px 10px', fontSize: '11px', fontWeight: '700', color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>ACTION</th>
                                                 </tr>
                                             </thead>
@@ -2166,37 +2192,50 @@ export default function Leads() {
                                                         </td>
 
                                                         {/* QTY */}
-                                                        <td style={{ padding: '10px', width: '65px' }}>
+                                                        <td style={{ padding: '10px', width: '80px', textAlign: 'center' }}>
                                                             <input
                                                                 required
                                                                 type="number"
                                                                 min="1"
-                                                                value={day.quantity || day.vehicleCount || 1}
+                                                                className="no-spinner"
+                                                                value={day.quantity !== undefined && day.quantity !== null && day.quantity !== '' ? day.quantity : (day.vehicleCount || 1)}
                                                                 onChange={e => handleItineraryRowChange(idx, 'quantity', e.target.value)}
-                                                                style={{ ...darkInputStyle, padding: '6px 8px', fontSize: '12px', textAlign: 'center' }}
+                                                                style={{
+                                                                    ...darkInputStyle,
+                                                                    padding: '6px 4px',
+                                                                    fontSize: '13px',
+                                                                    fontWeight: '700',
+                                                                    color: '#ffffff',
+                                                                    textAlign: 'center',
+                                                                    width: '60px',
+                                                                    margin: '0 auto',
+                                                                    display: 'block'
+                                                                }}
                                                             />
                                                         </td>
 
                                                         {/* RATE (₹) */}
-                                                        <td style={{ padding: '10px', width: '90px' }}>
+                                                        <td style={{ padding: '10px', width: '100px' }}>
                                                             <input
                                                                 type="number"
                                                                 min="0"
                                                                 placeholder="0"
-                                                                value={day.rate ?? 0}
+                                                                className="no-spinner"
+                                                                value={day.rate !== undefined && day.rate !== null ? day.rate : 0}
                                                                 onChange={e => handleItineraryRowChange(idx, 'rate', e.target.value)}
-                                                                style={{ ...darkInputStyle, padding: '6px 8px', fontSize: '12px', textAlign: 'right' }}
+                                                                style={{ ...darkInputStyle, padding: '6px 8px', fontSize: '12px', textAlign: 'right', color: '#ffffff' }}
                                                             />
                                                         </td>
 
                                                         {/* AMOUNT (₹) */}
-                                                        <td style={{ padding: '10px', width: '95px' }}>
+                                                        <td style={{ padding: '10px', width: '110px' }}>
                                                             <input
                                                                 type="number"
                                                                 min="0"
-                                                                value={day.amount ?? 0}
+                                                                className="no-spinner"
+                                                                value={day.amount !== undefined && day.amount !== null ? day.amount : 0}
                                                                 onChange={e => handleItineraryRowChange(idx, 'amount', e.target.value)}
-                                                                style={{ ...darkInputStyle, padding: '6px 8px', fontSize: '12px', textAlign: 'right', fontWeight: '700' }}
+                                                                style={{ ...darkInputStyle, padding: '6px 8px', fontSize: '12px', textAlign: 'right', fontWeight: '700', color: '#fbbf24' }}
                                                             />
                                                         </td>
 
