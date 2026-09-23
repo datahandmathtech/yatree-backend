@@ -225,16 +225,34 @@ const updateBankTransaction = asyncHandler(async (req, res) => {
     }
 
     // Update Booking advancePaid if linked
-    if (diff !== 0 && tx.bookingRef) {
+    if (tx.bookingRef) {
         const Booking = require('../models/Booking');
         const booking = await Booking.findById(tx.bookingRef);
         if (booking) {
-            if (tx.type === 'IN') {
-                booking.advancePaid = Math.max(0, (booking.advancePaid || 0) + diff);
-            } else {
-                booking.advancePaid = (booking.advancePaid || 0) - diff;
+            let noteStr = '';
+            if (diff !== 0) {
+                if (tx.type === 'IN') {
+                    booking.advancePaid = Math.max(0, (booking.advancePaid || 0) + diff);
+                } else {
+                    booking.advancePaid = (booking.advancePaid || 0) - diff;
+                }
+                noteStr += `\n[System]: Payment amount edited in Bank Book from ${oldAmount} to ${newAmount} on ${new Date().toLocaleDateString()}.`;
             }
-            booking.notes = (booking.notes || '') + `\n[System]: Payment edited in Bank Book from ${oldAmount} to ${newAmount} on ${new Date().toLocaleDateString()}.`;
+            
+            // ALWAYS sync the date if it was changed
+            if (date && booking.lead) {
+                const Lead = require('../models/Lead');
+                const lead = await Lead.findById(booking.lead);
+                if (lead) {
+                    lead.advanceDate = new Date(date);
+                    await lead.save();
+                    noteStr += `\n[System]: Payment date edited in Bank Book to ${new Date(date).toLocaleDateString()}.`;
+                }
+            }
+            
+            if (noteStr) {
+                booking.notes = (booking.notes || '') + noteStr;
+            }
             await booking.save();
         }
     }
@@ -290,6 +308,7 @@ const deleteBankTransaction = asyncHandler(async (req, res) => {
                         lead.advancePayment = 0;
                         lead.bookingRef = null;
                         lead.bookingId = '';
+                        lead.advanceDate = null;
                         await lead.save();
                     }
                 }

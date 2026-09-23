@@ -126,8 +126,8 @@ const createLead = asyncHandler(async (req, res) => {
     const {
         company, clientName, mobileNumber, alternateMobile, email, gstin,
         source, reference, salesPerson, leadDate, travelStartDate, travelEndDate,
-        carType, numberOfCars, itinerary, extraCharges, totalAmount, gstMode, gstRate, notes,
-        specialRemarks, inclusions, bookingReference, travelAgent, travelAgentName, travelAgentMobile
+        carType, numberOfCars, itinerary, extraCharges, totalAmount, advanceDate, gstMode, gstRate, notes,
+        specialRemarks, inclusions, bookingReference, travelAgent, travelAgentName, travelAgentMobile, priority
     } = req.body;
 
     const leadDateObj = leadDate ? new Date(leadDate) : new Date();
@@ -185,8 +185,10 @@ const createLead = asyncHandler(async (req, res) => {
         itinerary: formattedItinerary,
         extraCharges: extraCharges || [],
         totalAmount: Number(totalAmount) || 0,
+        advanceDate: advanceDate || null,
         gstMode: gstMode || 'GST Inclusive',
         gstRate: Number(gstRate) || 5,
+        priority: priority || 'Unassigned',
         status: 'New',
         notes,
         specialRemarks: specialRemarks || '',

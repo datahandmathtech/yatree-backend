@@ -55,6 +55,7 @@ const driverPerformanceRoutes = require('./routes/driverPerformanceRoutes');
 
 const aiRoutes = require('./routes/aiRoutes');
 const leadRoutes = require('./routes/leadRoutes');
+const whatsappRoutes = require('./routes/whatsappRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const drsRoutes = require('./routes/drsRoutes');
 const clientRoutes = require('./routes/clientRoutes');
@@ -87,6 +88,7 @@ app.use('/api/driver-performance', driverPerformanceRoutes);
 
 app.use('/api/ai', aiRoutes);
 app.use('/api/leads', leadRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/drs', drsRoutes);
 app.use('/api/clients', clientRoutes);
