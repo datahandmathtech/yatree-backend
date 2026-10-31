@@ -148,6 +148,11 @@ const drsDutySchema = new mongoose.Schema({
     driverNotes: {
         type: String,
         default: ''
+    },
+    stayType: {
+        type: String,
+        enum: ['Same Day Return', 'Night Hold'],
+        default: 'Same Day Return'
     }
 }, {
     timestamps: true

@@ -392,6 +392,7 @@ const createDRSDuty = asyncHandler(async (req, res) => {
                 cOut: cOut || '',
                 paymentStatus: (advance >= totalRev && totalRev > 0) ? 'Full Received' : (advance > 0 ? 'Advance Received' : 'Pending'),
                 status: status || (vItem.driver || vItem.customDriverName ? 'Assigned' : 'Scheduled'),
+                stayType: req.body.stayType || 'Same Day Return',
                 leadId: leadId || null,
                 bookingId: bookingId || null,
                 bookingRef: bookingRef || null,

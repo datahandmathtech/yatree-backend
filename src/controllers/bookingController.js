@@ -956,8 +956,30 @@ const assignBookingDrivers = asyncHandler(async (req, res) => {
             };
         });
 
-        booking.itinerary = normalizedItinerary;
-        booking.markModified('itinerary');
+        // PRESERVE booking.itinerary quotation: DO NOT overwrite with multi-car DRS duties list.
+        // Overwriting duplicates quotation days and corrupts agreed pricing.
+        // Instead, deduplicate any duplicate rows from past multi-car assignment bug and attach driver/vehicle:
+        if (Array.isArray(booking.itinerary) && booking.itinerary.length > 0) {
+            const seenKeys = new Set();
+            const cleanItin = [];
+            for (const it of booking.itinerary) {
+                const key = `${it.dayNo || 1}_${it.date ? String(it.date).slice(0, 10) : ''}`;
+                if (!seenKeys.has(key)) {
+                    seenKeys.add(key);
+                    const assigned = normalizedItinerary.find(d => Number(d.dayNo) === Number(it.dayNo));
+                    if (assigned) {
+                        it.driver = assigned.driver || it.driver;
+                        it.driverName = assigned.driverName || it.driverName;
+                        it.driverPhone = assigned.driverPhone || it.driverPhone;
+                        it.vehicle = assigned.vehicle || it.vehicle;
+                        it.vehicleNumber = assigned.vehicleNumber || it.vehicleNumber;
+                    }
+                    cleanItin.push(it);
+                }
+            }
+            booking.itinerary = cleanItin;
+            booking.markModified('itinerary');
+        }
 
         // Check if multiple cars exist across dates
         const carCountByDate = {};
@@ -970,14 +992,9 @@ const assignBookingDrivers = asyncHandler(async (req, res) => {
             booking.numberOfCars = maxCars;
         }
 
-        const sumDayAmounts = normalizedItinerary.reduce((acc, d) => acc + (Number(d.amount) || 0), 0);
+        // Preserve booking agreed totalAmount and calculate balanceDue
         const fuelDeduction = (booking.guestFuelFilled || Number(booking.guestFuelAmount) > 0) ? (Number(booking.guestFuelAmount) || 0) : 0;
-        if (sumDayAmounts > 0) {
-            booking.totalAmount = sumDayAmounts;
-            booking.balanceDue = Math.max(0, sumDayAmounts - (Number(booking.advancePaid) || 0) - fuelDeduction);
-        } else {
-            booking.balanceDue = Math.max(0, (Number(booking.totalAmount) || 0) - (Number(booking.advancePaid) || 0) - fuelDeduction);
-        }
+        booking.balanceDue = Math.max(0, (Number(booking.totalAmount) || 0) - (Number(booking.advancePaid) || 0) - fuelDeduction);
 
         if (booking.totalAmount > 0 && booking.balanceDue <= 0) {
             booking.paymentStatus = 'Full Received';
@@ -1096,6 +1113,7 @@ const assignBookingDrivers = asyncHandler(async (req, res) => {
                 matchingDuty.customCarNumber = vehicleNumber;
                 matchingDuty.revenue = day.amount !== undefined ? Number(day.amount) : matchingDuty.revenue;
                 matchingDuty.km = day.km || matchingDuty.km || '';
+                matchingDuty.stayType = day.stayType || 'Same Day Return';
                 matchingDuty.paymentStatus = effectivePaymentStatus;
                 matchingDuty.status = 'Assigned';
                 matchingDuty.guestFuelFilled = Boolean(booking.guestFuelFilled);
@@ -1138,6 +1156,7 @@ const assignBookingDrivers = asyncHandler(async (req, res) => {
                     customCarNumber: vehicleNumber,
                     revenue: day.amount || 0,
                     km: day.km || '',
+                    stayType: day.stayType || 'Same Day Return',
                     paymentStatus: effectivePaymentStatus,
                     status: 'Assigned',
                     isDirectBooking: false,
