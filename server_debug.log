@@ -707,3 +707,43 @@
 [2026-10-31T11:51:42.616Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":true,"vehicleSource":{"$ne":"Fleet"},"company":"698ac8b01587e01651a49443"}
 [2026-10-31T11:53:30.435Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
 [2026-10-31T11:53:30.443Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":true,"vehicleSource":{"$ne":"Fleet"},"company":"698ac8b01587e01651a49443"}
+[2026-10-31T11:58:43.385Z] Login attempt started
+[2026-10-31T11:58:43.386Z] Login request for: Kavishuser1
+[2026-10-31T11:58:43.518Z] User found: Yatree (Role: Admin)
+[2026-10-31T11:58:43.741Z] Match debug: receivedPwdLen=11, dbHashStart=$2a$10$SZI, isMatch=true
+[2026-10-31T11:58:43.742Z] Password matched
+[2026-10-31T11:58:43.742Z] DEBUG: Company status in DB is: "active" (Normalized: "active")
+[2026-10-31T11:58:55.880Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-10-31T11:58:59.972Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":true,"vehicleSource":{"$ne":"Fleet"},"company":"698ac8b01587e01651a49443"}
+[2026-10-31T12:02:25.383Z] GLOBAL_ERROR: E11000 duplicate key error collection: taxi-fleet.bookings index: bookingId_1 dup key: { bookingId: "10/131" } - Stack: MongoServerError: E11000 duplicate key error collection: taxi-fleet.bookings index: bookingId_1 dup key: { bookingId: "10/131" }
+    at InsertOneOperation.handleOk (e:\New folder\Master-Server\TEXI\yatree-backend\node_modules\mongodb\lib\operations\insert.js:51:19)
+    at tryOperation (e:\New folder\Master-Server\TEXI\yatree-backend\node_modules\mongodb\lib\operations\execute_operation.js:214:34)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async executeOperation (e:\New folder\Master-Server\TEXI\yatree-backend\node_modules\mongodb\lib\operations\execute_operation.js:78:16)
+    at async Collection.insertOne (e:\New folder\Master-Server\TEXI\yatree-backend\node_modules\mongodb\lib\collection.js:154:16)
+[2026-10-31T12:02:31.117Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-10-31T12:02:37.388Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":true,"vehicleSource":{"$ne":"Fleet"},"company":"698ac8b01587e01651a49443"}
+[2026-10-31T12:04:33.764Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-10-31T12:04:50.968Z] CRON: Cron Jobs Initialized
+[2026-10-31T12:04:53.514Z] GLOBAL_ERROR: Not Found - /api/bank/accounts?companyId=698ac8b01587e01651a49443 - Stack: Error: Not Found - /api/bank/accounts?companyId=698ac8b01587e01651a49443
+    at notFound (e:\New folder\Master-Server\TEXI\yatree-backend\src\middleware\errorMiddleware.js:2:19)
+    at Layer.handle [as handle_request] (e:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\layer.js:95:5)
+    at trim_prefix (e:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:328:13)
+    at e:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:286:9
+    at Function.process_params (e:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:346:12)
+    at next (e:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\index.js:280:10)
+    at next (e:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\route.js:141:14)
+    at e:\New folder\Master-Server\TEXI\yatree-backend\src\app.js:159:16
+    at Layer.handle [as handle_request] (e:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\layer.js:95:5)
+    at next (e:\New folder\Master-Server\TEXI\yatree-backend\node_modules\express\lib\router\route.js:149:13)
+[2026-10-31T12:04:53.535Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":{"$ne":true},"company":"698ac8b01587e01651a49443","status":"active"}
+[2026-10-31T12:05:07.456Z] DEBUG: getAllVehicles - Query: {"$or":[{"company":"698ac8b01587e01651a49443"},{"company":"698ac8b01587e01651a49443"}],"isOutsideCar":true,"vehicleSource":{"$ne":"Fleet"},"company":"698ac8b01587e01651a49443"}
+[2026-10-31T12:06:07.092Z] Login attempt started
+[2026-10-31T12:06:07.093Z] Login request for: RahulG
+[2026-10-31T12:06:07.334Z] User found: Rahul  (Role: Driver)
+[2026-10-31T12:06:07.505Z] Match debug: receivedPwdLen=6, dbHashStart=$2a$10$th., isMatch=true
+[2026-10-31T12:06:07.505Z] Password matched
+[2026-10-31T12:06:07.506Z] DEBUG: Company status in DB is: "active" (Normalized: "active")
+[2026-10-31T12:06:09.286Z] DRIVER_CTRL: getDriverDashboard - User: 6a3e03cc6d3273b4a2f5e219, Company: 698ac8b01587e01651a49443
+[2026-10-31T12:06:11.820Z] DRIVER_CTRL: getDriverDashboard - User: 6a3e03cc6d3273b4a2f5e219, Comp: 698ac8b01587e01651a49443, Found: 3 vehicles
+[2026-10-31T12:06:12.270Z] DRIVER_CTRL: getDriverDashboard - Final Status: approved, Current Car: None

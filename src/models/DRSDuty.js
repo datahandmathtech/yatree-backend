@@ -151,8 +151,8 @@ const drsDutySchema = new mongoose.Schema({
     },
     stayType: {
         type: String,
-        enum: ['Same Day Return', 'Night Hold'],
-        default: 'Same Day Return'
+        enum: ['Local', 'Same Day Return', 'Night Hold'],
+        default: 'Local'
     }
 }, {
     timestamps: true
